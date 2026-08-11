@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlindGuard 智能导盲系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .header {
+            background: rgba(255,255,255,0.1);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo h1 { font-size: 20px; }
+        .logo p { font-size: 12px; opacity: 0.7; }
+        .main-container {
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .video-section {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        .video-header {
+            padding: 15px 20px;
+            background: rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .video-container {
+            background: #000;
+            aspect-ratio: 4/3;
+            max-height: 500px;
+            position: relative;
+        }
+        .video-container img { width: 100%; height: 100%; object-fit: contain; }
+
+        /* 视频控制栏 */
+        .video-controls {
+            background: rgba(0,0,0,0.8);
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .progress-bar {
+            flex: 1;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.1s;
+        }
+        .progress-bar:hover .progress-fill {
+            height: 8px;
+            margin-top: -1px;
+        }
+        .time-display {
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+            min-width: 100px;
+        }
+        .speed-btn, .control-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .speed-btn:hover, .control-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .speed-btn.active {
+            background: #667eea;
+        }
+
+        .control-panel {
+            width: 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .panel-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+        }
+        .panel-card h3 { font-size: 16px; margin-bottom: 15px; }
+        .btn-group { display: flex; gap: 10px; }
+        .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .btn-success { background: linear-gradient(135deg, #11998e, #38ef7d); color: #fff; }
+        .btn-danger { background: linear-gradient(135deg, #eb3349, #f45c43); color: #fff; }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .status-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .status-label { font-size: 12px; opacity: 0.7; }
+        .status-value { font-size: 24px; font-weight: 600; }
+        .status-value.normal { color: #38ef7d; }
+        .risk-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+        .risk-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .risk-dot.safe { background: #38ef7d; box-shadow: 0 0 10px #38ef7d; }
+        .risk-dot.low { background: #667eea; box-shadow: 0 0 10px #667eea; }
+        .risk-dot.medium { background: #f4a261; box-shadow: 0 0 10px #f4a261; }
+        .risk-dot.high { background: #f45c43; box-shadow: 0 0 10px #f45c43; }
+        .detection-list { max-height: 300px; overflow-y: auto; }
+        .detection-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .message-area {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 60px;
+        }
+        .message { font-size: 14px; line-height: 1.6; }
+        .message.warning { color: #f45c43; }
+        .message.info { color: #667eea; }
+        .upload-area {
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        .upload-area:hover { border-color: #667eea; }
+        .upload-area input { display: none; }
+        @media (max-width: 900px) {
+            .main-container { flex-direction: column; }
+            .control-panel { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <div>
+                <h1>BlindGuard</h1>
+                <p>智能导盲系统 V1.0</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <section class="video-section">
+            <div class="video-header">
+                <h3>实时监控</h3>
+            </div>
+            <div class="video-container">
+                <img id="videoFeed" src="/video_feed" alt="视频流">
+            </div>
+            <!-- 视频控制栏 -->
+            <div class="video-controls" id="videoControls" style="display:none;">
+                <button class="control-btn" id="btnPause" onclick="togglePause()">暂停</button>
+                <div class="progress-bar" id="progressBar" onclick="seekVideo(event)">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="time-display" id="timeDisplay">0:00 / 0:00</div>
+                <div class="btn-group">
+                    <button class="speed-btn" onclick="setSpeed(0.5)">0.5x</button>
+                    <button class="speed-btn active" onclick="setSpeed(1.0)">1x</button>
+                    <button class="speed-btn" onclick="setSpeed(1.5)">1.5x</button>
+                    <button class="speed-btn" onclick="setSpeed(2.0)">2x</button>
+                </div>
+            </div>
+        </section>
+
+        <aside class="control-panel">
+            <div class="panel-card">
+                <h3>系统控制</h3>
+                <div class="btn-group">
+                    <button class="btn btn-success" id="btnStartSystem" onclick="startSystem()">启动系统</button>
+                    <button class="btn btn-danger" id="btnStopSystem" onclick="stopSystem()" disabled>停止系统</button>
+                </div>
+                <div class="btn-group" style="margin-top:10px">
+                    <button class="btn btn-primary" id="btnStartCamera" onclick="startCamera()" disabled>开启摄像头</button>
+                    <button class="btn btn-secondary" id="btnStopCamera" onclick="stopCamera()" disabled>关闭摄像头</button>
+                </div>
+                <div class="upload-area" onclick="document.getElementById('videoFile').click()">
+                    <input type="file" id="videoFile" accept="video/*" onchange="uploadVideo(this)">
+                    <p>点击上传视频文件</p>
+                    <small>支持 mp4, avi, mov 等格式</small>
+                </div>
+                <div class="btn-group" style="margin-top:10px">
+                    <button class="btn btn-secondary" id="btnStopVideo" onclick="stopVideo()" disabled>停止视频</button>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h3>系统状态</h3>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label">FPS</div>
+                        <div class="status-value normal" id="fpsValue">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">检测目标</div>
+                        <div class="status-value normal" id="objectCount">0</div>
+                    </div>
+                </div>
+                <div class="risk-indicator">
+                    <div class="risk-dot safe" id="riskDot"></div>
+                    <div>
+                        <div class="status-label">风险等级</div>
+                        <div class="status-value" id="riskLevel">安全</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h3>警告信息</h3>
+                <div class="message-area" id="messageArea">
+                    <div class="message info">系统就绪，请启动系统开始检测</div>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h3>检测结果</h3>
+                <div class="detection-list" id="detectionList">
+                    <div class="message info">暂无检测结果</div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        let systemRunning = false;
+        let cameraActive = false;
+        let videoActive = false;
+        let videoPaused = false;
+        let currentSpeed = 1.0;
+        let statusInterval = null;
+
+        // 系统控制
+        async function startSystem() {
+            try {
+                const res = await fetch('/api/system/start', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    systemRunning = true;
+                    updateUI();
+                    showMessage('系统已启动', 'info');
+                    startStatusPolling();
+                } else {
+                    showMessage('启动失败: ' + data.message, 'warning');
+                }
+            } catch (e) { showMessage('启动失败: ' + e.message, 'warning'); }
+        }
+
+        async function stopSystem() {
+            try {
+                const res = await fetch('/api/system/stop', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    systemRunning = false;
+                    cameraActive = false;
+                    videoActive = false;
+                    updateUI();
+                    showMessage('系统已停止', 'info');
+                    stopStatusPolling();
+                    document.getElementById('videoControls').style.display = 'none';
+                }
+            } catch (e) { showMessage('停止失败: ' + e.message, 'warning'); }
+        }
+
+        async function startCamera() {
+            try {
+                const res = await fetch('/api/camera/start', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    cameraActive = true;
+                    videoActive = false;
+                    document.getElementById('videoControls').style.display = 'none';
+                    updateUI();
+                    showMessage('摄像头已开启', 'info');
+                } else {
+                    showMessage('摄像头启动失败: ' + data.message, 'warning');
+                }
+            } catch (e) { showMessage('摄像头启动失败: ' + e.message, 'warning'); }
+        }
+
+        async function stopCamera() {
+            try {
+                const res = await fetch('/api/camera/stop', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    cameraActive = false;
+                    updateUI();
+                    showMessage('摄像头已关闭', 'info');
+                }
+            } catch (e) { showMessage('关闭失败: ' + e.message, 'warning'); }
+        }
+
+        // 视频上传
+        async function uploadVideo(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('video', file);
+            try {
+                showMessage('正在上传视频...', 'info');
+                const res = await fetch('/api/video/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    videoActive = true;
+                    cameraActive = false;
+                    updateUI();
+                    showMessage('视频上传成功，开始检测', 'info');
+                    document.getElementById('videoControls').style.display = 'flex';
+                    document.getElementById('videoFeed').src = '/video_feed?' + new Date().getTime();
+                    startStatusPolling();
+                } else {
+                    showMessage('上传失败: ' + data.message, 'warning');
+                }
+            } catch (e) { showMessage('上传失败: ' + e.message, 'warning'); }
+            input.value = '';
+        }
+
+        // 视频控制
+        async function togglePause() {
+            const endpoint = videoPaused ? '/api/video/resume' : '/api/video/pause';
+            try {
+                const res = await fetch(endpoint, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    videoPaused = !videoPaused;
+                    document.getElementById('btnPause').textContent = videoPaused ? '播放' : '暂停';
+                }
+            } catch (e) {}
+        }
+
+        function seekVideo(event) {
+            const bar = document.getElementById('progressBar');
+            const rect = bar.getBoundingClientRect();
+            const percent = (event.clientX - rect.left) / rect.width;
+            const totalFrames = parseInt(document.getElementById('timeDisplay').dataset.total || 0);
+            const targetFrame = Math.floor(percent * totalFrames);
+
+            fetch('/api/video/seek', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ frame: targetFrame })
+            });
+        }
+
+        async function setSpeed(speed) {
+            currentSpeed = speed;
+            try {
+                const res = await fetch('/api/video/speed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ speed: speed })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    // 更新按钮状态
+                    document.querySelectorAll('.speed-btn').forEach(btn => {
+                        btn.classList.toggle('active', parseFloat(btn.textContent) === speed);
+                    });
+                    showMessage(`播放倍速: ${speed}x`, 'info');
+                }
+            } catch (e) {}
+        }
+
+        async function stopVideo() {
+            try {
+                const res = await fetch('/api/video/stop', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    videoActive = false;
+                    document.getElementById('videoControls').style.display = 'none';
+                    updateUI();
+                    showMessage('视频播放已停止', 'info');
+                }
+            } catch (e) { showMessage('停止失败: ' + e.message, 'warning'); }
+        }
+
+        // 状态轮询
+        function startStatusPolling() {
+            if (statusInterval) clearInterval(statusInterval);
+            statusInterval = setInterval(updateStatus, 500);
+        }
+
+        function stopStatusPolling() {
+            if (statusInterval) { clearInterval(statusInterval); statusInterval = null; }
+        }
+
+        function formatTime(frames, fps) {
+            if (!fps) fps = 30;
+            const seconds = Math.floor(frames / fps);
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function updateStatus() {
+            try {
+                // 更新系统状态
+                const res = await fetch('/api/system/status');
+                const data = await res.json();
+                document.getElementById('fpsValue').textContent = Math.round(data.fps || 0);
+                document.getElementById('objectCount').textContent = data.detection_count || 0;
+
+                // 更新视频进度
+                if (data.video_active) {
+                    const pos = data.video_position || 0;
+                    const total = data.video_total || 1;
+                    const percent = (pos / total * 100).toFixed(1);
+                    document.getElementById('progressFill').style.width = percent + '%';
+
+                    const timeDisplay = document.getElementById('timeDisplay');
+                    timeDisplay.textContent = `${formatTime(pos)} / ${formatTime(total)}`;
+                    timeDisplay.dataset.total = total;
+
+                    // 更新暂停按钮
+                    videoPaused = data.video_paused;
+                    document.getElementById('btnPause').textContent = videoPaused ? '播放' : '暂停';
+
+                    // 更新倍速按钮
+                    if (data.video_speed !== currentSpeed) {
+                        currentSpeed = data.video_speed;
+                        document.querySelectorAll('.speed-btn').forEach(btn => {
+                            btn.classList.toggle('active', parseFloat(btn.textContent) === currentSpeed);
+                        });
+                    }
+                }
+            } catch (e) {}
+
+            // 更新检测结果
+            try {
+                const res = await fetch('/api/detections');
+                const data = await res.json();
+                const list = document.getElementById('detectionList');
+                if (!data.detections || data.detections.length === 0) {
+                    list.innerHTML = '<div class="message info">暂无检测结果</div>';
+                    return;
+                }
+                let html = '';
+                data.detections.forEach(det => {
+                    const conf = (det.confidence * 100).toFixed(1);
+                    const risk = det.risk_level || 'safe';
+                    const name = det.class_name_cn || det.class_name || '未知';
+                    html += `<div class="detection-item">
+                        <div><b>${name}</b> (${conf}%)</div>
+                        <div class="risk-dot ${risk}"></div>
+                    </div>`;
+                });
+                list.innerHTML = html;
+
+                if (data.detections.length > 0) {
+                    const topRisk = data.detections[0].risk_level || 'safe';
+                    document.getElementById('riskDot').className = 'risk-dot ' + topRisk;
+                    const names = { safe: '安全', low: '低风险', medium: '中等风险', high: '高风险' };
+                    document.getElementById('riskLevel').textContent = names[topRisk] || '安全';
+                }
+            } catch (e) {}
+        }
+
+        function updateUI() {
+            document.getElementById('btnStartSystem').disabled = systemRunning;
+            document.getElementById('btnStopSystem').disabled = !systemRunning;
+            document.getElementById('btnStartCamera').disabled = !systemRunning || cameraActive;
+            document.getElementById('btnStopCamera').disabled = !cameraActive;
+            document.getElementById('btnStopVideo').disabled = !videoActive;
+        }
+
+        function showMessage(text, type = 'info') {
+            const area = document.getElementById('messageArea');
+            area.innerHTML = `<div class="message ${type}">${text}</div>`;
+        }
+
+        document.addEventListener('DOMContentLoaded', updateUI);
+    </script>
+</body>
+</html>

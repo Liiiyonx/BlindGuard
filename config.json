@@ -1,0 +1,35 @@
+{
+  "model": {
+    "path": "yolov8n.pt",
+    "confidence_threshold": 0.45,
+    "iou_threshold": 0.5,
+    "device": ""
+  },
+  "risk": {
+    "thresholds": {
+      "distance": {
+        "very_close": 0.20,
+        "close": 0.10,
+        "medium": 0.04,
+        "far": 0.01
+      }
+    }
+  },
+  "voice": {
+    "rate": 160,
+    "volume": 1.0,
+    "cooldown": 3.0,
+    "language": "chinese"
+  },
+  "camera": {
+    "device_id": 0,
+    "width": 640,
+    "height": 480,
+    "fps": 15
+  },
+  "system": {
+    "log_level": "INFO",
+    "log_dir": "logs",
+    "upload_dir": "uploads"
+  }
+}

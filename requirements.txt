@@ -1,0 +1,24 @@
+# BlindGuard 智能导盲系统依赖清单
+# 版本要求：Python 3.8+
+
+# Web框架
+flask>=2.3.0
+werkzeug>=2.3.0
+
+# 计算机视觉
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# 深度学习
+ultralytics>=8.0.0
+
+# 语音合成
+pyttsx3>=2.90
+
+# 数据处理
+pandas>=2.0.0
+
+# 日志和工具
+colorlog>=6.7.0
+python-dotenv>=1.0.0

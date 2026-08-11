@@ -1,0 +1,166 @@
+# ============================================
+# BlindGuard 智能导盲系统 V1.0 - 配置文件
+# ============================================
+
+# 摄像头配置
+camera:
+  index: 0                  # 摄像头索引，0 为默认摄像头
+  width: 640                # 视频宽度
+  height: 480               # 视频高度
+  fps: 30                   # 目标帧率
+
+# YOLOv10 检测模型配置
+detector:
+  model_path: "best.pt"     # 模型文件路径（使用训练好的自定义模型）
+  confidence: 0.5           # 置信度阈值（可调）
+  iou_threshold: 0.45       # IoU 阈值（可调）
+  device: ""                # 推理设备：""=自动, "cpu", "cuda:0"
+  img_size: 640             # 推理图像尺寸
+
+# 危险判断引擎配置（阈值可调）
+risk_engine:
+  # 面积占比阈值（目标面积 / 画面总面积）
+  area_thresholds:
+    close: 0.15             # 近距离阈值：面积占比 >= 15% 视为非常近
+    medium: 0.05            # 中距离阈值：面积占比 >= 5% 视为中等距离
+    far: 0.01               # 远距离阈值：面积占比 >= 1% 视为较远
+
+  # 危险等级：high=高危, medium=中等, low=低危, safe=安全
+  # 高危类别（靠近即危险）
+  high_risk_classes:
+    - "car"
+    - "truck"
+    - "bus"
+    - "motorcycle"
+    - "bicycle"
+    - "train"
+    - "fire hydrant"
+
+  # 中等危险类别（障碍物）
+  medium_risk_classes:
+    - "person"
+    - "dog"
+    - "cat"
+    - "chair"
+    - "bench"
+    - "potted plant"
+    - "suitcase"
+    - "backpack"
+    - "umbrella"
+    - "stop sign"
+    - "parking meter"
+
+  # 低危类别（一般物品）
+  low_risk_classes:
+    - "bottle"
+    - "cup"
+    - "book"
+    - "cell phone"
+    - "laptop"
+    - "mouse"
+    - "keyboard"
+    - "tv"
+    - "remote"
+    - "clock"
+
+# 语音播报配置
+announcer:
+  engine: "pyttsx3"         # 语音引擎：pyttsx3 或 edge-tts
+  rate: 180                 # 语速（pyttsx3 专用）
+  volume: 1.0               # 音量 0.0 - 1.0
+  cooldown: 3.0             # 相同内容播报冷却时间（秒）
+
+# 日志配置
+logger:
+  enabled: true             # 是否启用日志记录
+  log_dir: "logs"           # 日志目录
+  max_rows: 10000           # 单个 CSV 文件最大行数
+
+# Flask 服务器配置
+server:
+  host: "0.0.0.0"           # 监听地址
+  port: 5000                # 监听端口
+  debug: false              # 调试模式
+
+# 英文类别 -> 中文类别映射
+class_mapping:
+  person: "行人"
+  bicycle: "自行车"
+  car: "汽车"
+  motorcycle: "摩托车"
+  airplane: "飞机"
+  bus: "公交车"
+  train: "火车"
+  truck: "卡车"
+  boat: "船"
+  traffic light: "红绿灯"
+  fire hydrant: "消防栓"
+  stop sign: "停车标志"
+  parking meter: "停车计时器"
+  bench: "长椅"
+  bird: "鸟"
+  cat: "猫"
+  dog: "狗"
+  horse: "马"
+  sheep: "羊"
+  cow: "牛"
+  elephant: "大象"
+  bear: "熊"
+  zebra: "斑马"
+  giraffe: "长颈鹿"
+  backpack: "背包"
+  umbrella: "雨伞"
+  handbag: "手提包"
+  tie: "领带"
+  suitcase: "行李箱"
+  frisbee: "飞盘"
+  skis: "滑雪板"
+  snowboard: "滑雪板"
+  sports ball: "运动球"
+  kite: "风筝"
+  baseball bat: "棒球棒"
+  baseball glove: "棒球手套"
+  skateboard: "滑板"
+  surfboard: "冲浪板"
+  tennis racket: "网球拍"
+  bottle: "瓶子"
+  wine glass: "酒杯"
+  cup: "杯子"
+  fork: "叉子"
+  knife: "刀"
+  spoon: "勺子"
+  bowl: "碗"
+  banana: "香蕉"
+  apple: "苹果"
+  sandwich: "三明治"
+  orange: "橙子"
+  broccoli: "西兰花"
+  carrot: "胡萝卜"
+  hot dog: "热狗"
+  pizza: "披萨"
+  donut: "甜甜圈"
+  cake: "蛋糕"
+  chair: "椅子"
+  couch: "沙发"
+  potted plant: "盆栽"
+  bed: "床"
+  dining table: "餐桌"
+  toilet: "马桶"
+  tv: "电视"
+  laptop: "笔记本电脑"
+  mouse: "鼠标"
+  remote: "遥控器"
+  keyboard: "键盘"
+  cell phone: "手机"
+  microwave: "微波炉"
+  oven: "烤箱"
+  toaster: "烤面包机"
+  sink: "水槽"
+  refrigerator: "冰箱"
+  book: "书"
+  clock: "时钟"
+  vase: "花瓶"
+  scissors: "剪刀"
+  teddy bear: "泰迪熊"
+  hair drier: "吹风机"
+  toothbrush: "牙刷"
