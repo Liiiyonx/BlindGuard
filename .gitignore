@@ -27,3 +27,8 @@ uploads/
 .DS_Store
 Thumbs.db
 desktop.ini
+uploads/
+logs/
+*.log
+__pycache__/
+.env
