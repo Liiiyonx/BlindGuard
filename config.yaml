@@ -19,11 +19,12 @@ detector:
 
 # 危险判断引擎配置（阈值可调）
 risk_engine:
-  # 面积占比阈值（目标面积 / 画面总面积）
+  # 面积占比阈值（目标面积 / 画面总面积），与代码内距离分档一一对应
   area_thresholds:
-    close: 0.15             # 近距离阈值：面积占比 >= 15% 视为非常近
-    medium: 0.05            # 中距离阈值：面积占比 >= 5% 视为中等距离
-    far: 0.01               # 远距离阈值：面积占比 >= 1% 视为较远
+    very_close: 0.15        # 面积占比 >= 15% 视为非常近
+    close: 0.10             # >= 10% 视为近
+    medium: 0.05            # >= 5% 视为中等距离
+    far: 0.01               # >= 1% 视为较远，更低为非常远
 
   # 危险等级：high=高危, medium=中等, low=低危, safe=安全
   # 高危类别（靠近即危险）
@@ -76,7 +77,7 @@ announcer:
 
 # ============================================
 # 智能体（Agent）配置
-# 在原有 CV 管线上叠加 LLM 推理，实现自然播报、对话、时序记忆。
+# 在原有 CV 管线上叠加 LLM 推理，实现自然播报、工具调用对话、时序记忆。
 # 未配置 api_key 或调用失败时自动回退到模板播报，系统仍可完整运行。
 # 支持任意 OpenAI 兼容端点（DeepSeek/通义千问/智谱GLM/OpenAI）。
 # 也可通过环境变量覆盖：BLINDGUARD_AGENT_LLM_API_KEY 等。
@@ -89,6 +90,11 @@ agent:
     model: "deepseek-chat"  # 模型名
     temperature: 0.6        # 采样温度
     timeout: 8              # 请求超时（秒）
+  vision:                   # 可选：多模态视觉端点（Agent 的"看图"工具 look_at_frame）
+    base_url: ""            # 如 "https://open.bigmodel.cn/api/paas/v4"
+    api_key: ""             # 留空！或环境变量 BLINDGUARD_AGENT_VISION_API_KEY
+    model: ""               # 如 "glm-4v-flash" / "qwen-vl-plus"
+    timeout: 20             # 看图请求超时（秒），比文本请求慢属正常
   announce:
     cooldown: 3.0           # 播报冷却（秒），避免每帧都调 LLM
     memory_size: 8          # 时序记忆滑动窗口帧数

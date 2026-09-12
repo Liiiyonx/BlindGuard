@@ -34,10 +34,36 @@ class ConfigManager:
     DEFAULT_CONFIG = {
         # 模型配置
         'model': {
-            'path': 'yolov8n.pt',
+            'path': 'best.pt',
             'confidence_threshold': 0.45,
             'iou_threshold': 0.5,
-            'device': ''
+            'device': '',
+            'img_size': 640
+        },
+
+        # 智能体配置（详细说明见 config.yaml）
+        'agent': {
+            'enabled': True,
+            'llm': {
+                'base_url': '',
+                'api_key': '',
+                'model': 'deepseek-chat',
+                'temperature': 0.6,
+                'timeout': 8
+            },
+            'vision': {
+                'base_url': '',
+                'api_key': '',
+                'model': '',
+                'timeout': 20
+            },
+            'announce': {
+                'cooldown': 3.0,
+                'memory_size': 8
+            },
+            'chat': {
+                'max_history': 6
+            }
         },
 
         # 风险评估配置
@@ -87,8 +113,29 @@ class ConfigManager:
         }
     }
 
-    # 环境变量前缀
-    ENV_PREFIX = 'BLINDGUARD_'
+    # 显式环境变量映射：env 名 -> (配置路径, 类型)
+    # 环境变量名中的下划线与配置键的点号无法无歧义互转，
+    # 故采用显式映射而非自动解析（自动解析会把 device_id 变成 device.id）
+    ENV_KEYS = {
+        'BLINDGUARD_MODEL_PATH': ('model.path', str),
+        'BLINDGUARD_MODEL_CONFIDENCE': ('model.confidence_threshold', float),
+        'BLINDGUARD_MODEL_IOU': ('model.iou_threshold', float),
+        'BLINDGUARD_CAMERA_DEVICE_ID': ('camera.device_id', int),
+        'BLINDGUARD_CAMERA_WIDTH': ('camera.width', int),
+        'BLINDGUARD_CAMERA_HEIGHT': ('camera.height', int),
+        'BLINDGUARD_VOICE_RATE': ('voice.rate', int),
+        'BLINDGUARD_VOICE_VOLUME': ('voice.volume', float),
+        'BLINDGUARD_VOICE_COOLDOWN': ('voice.cooldown', float),
+        'BLINDGUARD_SERVER_HOST': ('server.host', str),
+        'BLINDGUARD_SERVER_PORT': ('server.port', int),
+        'BLINDGUARD_AGENT_ENABLED': ('agent.enabled', '_bool'),
+        'BLINDGUARD_AGENT_LLM_BASE_URL': ('agent.llm.base_url', str),
+        'BLINDGUARD_AGENT_LLM_API_KEY': ('agent.llm.api_key', str),
+        'BLINDGUARD_AGENT_LLM_MODEL': ('agent.llm.model', str),
+        'BLINDGUARD_AGENT_VISION_BASE_URL': ('agent.vision.base_url', str),
+        'BLINDGUARD_AGENT_VISION_API_KEY': ('agent.vision.api_key', str),
+        'BLINDGUARD_AGENT_VISION_MODEL': ('agent.vision.model', str),
+    }
 
     def __init__(self, config_path: Optional[str] = None):
         """
@@ -104,11 +151,26 @@ class ConfigManager:
             # 自动查找配置文件（优先YAML）
             self.config_path = self._find_config_file()
 
+        # 加载 .env 到环境变量（密钥不落配置文件）
+        self._load_dotenv()
+
         # 运行时配置
         self._config = {}
 
         # 加载配置
         self._load_config()
+
+    def _load_dotenv(self):
+        """加载配置文件同目录下的 .env（存在则优先）"""
+        try:
+            from dotenv import load_dotenv
+        except ImportError:
+            return
+        env_file = self.config_path.parent / '.env'
+        if env_file.exists():
+            load_dotenv(env_file)
+        else:
+            load_dotenv()  # 回退到默认查找
 
     def _find_config_file(self) -> Path:
         """自动查找配置文件"""
@@ -208,37 +270,20 @@ class ConfigManager:
             config['class_mapping'] = config['class_mapping']
 
     def _load_from_env(self):
-        """从环境变量加载配置"""
-        for key, value in os.environ.items():
-            if key.startswith(self.ENV_PREFIX):
-                # 转换环境变量名到配置路径
-                config_key = key[len(self.ENV_PREFIX):].lower().replace('_', '.')
-                self._set_nested(config_key, self._parse_env_value(value))
-
-    def _parse_env_value(self, value: str) -> Any:
-        """解析环境变量值"""
-        # 尝试解析为JSON
-        try:
-            return json.loads(value)
-        except (json.JSONDecodeError, ValueError):
-            pass
-
-        # 尝试解析为布尔值
-        if value.lower() in ('true', 'yes', '1'):
-            return True
-        if value.lower() in ('false', 'no', '0'):
-            return False
-
-        # 尝试解析为数字
-        try:
-            if '.' in value:
-                return float(value)
-            return int(value)
-        except ValueError:
-            pass
-
-        # 返回字符串
-        return value
+        """从环境变量加载配置（显式映射，见 ENV_KEYS）"""
+        for env_key, (config_key, caster) in self.ENV_KEYS.items():
+            value = os.environ.get(env_key)
+            if value is None:
+                continue
+            try:
+                if caster == '_bool':
+                    parsed = value.strip().lower() in ('1', 'true', 'yes', 'on')
+                else:
+                    parsed = caster(value)
+            except (ValueError, TypeError):
+                logger.warning(f"环境变量 {env_key} 值非法: {value}")
+                continue
+            self._set_nested(config_key, parsed)
 
     def get(self, key: str, default: Any = None) -> Any:
         """
@@ -270,13 +315,21 @@ class ConfigManager:
         logger.debug(f"配置已更新: {key} = {value}")
 
     def save(self):
-        """保存配置到文件"""
+        """保存配置到文件（按扩展名选择格式，不损坏 YAML）"""
         try:
             # 确保目录存在
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
 
             with open(self.config_path, 'w', encoding='utf-8') as f:
-                json.dump(self._config, f, indent=2, ensure_ascii=False)
+                if self.config_path.suffix in ('.yaml', '.yml'):
+                    if HAS_YAML:
+                        yaml.safe_dump(self._config, f, allow_unicode=True,
+                                       sort_keys=False, default_flow_style=False)
+                    else:
+                        logger.error("保存 YAML 配置需要安装 pyyaml: pip install pyyaml")
+                        return
+                else:
+                    json.dump(self._config, f, indent=2, ensure_ascii=False)
 
             logger.info(f"配置已保存到: {self.config_path}")
 

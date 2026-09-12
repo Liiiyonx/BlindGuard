@@ -8,7 +8,6 @@ werkzeug>=2.3.0
 # 计算机视觉
 opencv-python>=4.8.0
 numpy>=1.24.0
-Pillow>=10.0.0
 
 # 深度学习
 ultralytics>=8.0.0
@@ -16,12 +15,6 @@ ultralytics>=8.0.0
 # 语音合成
 pyttsx3>=2.90
 
-# 数据处理
-pandas>=2.0.0
-
-# 日志和工具
-colorlog>=6.7.0
+# 工具
 python-dotenv>=1.0.0
-
-# 配置文件（agent/检测/风险等全部配置生效必需）
 pyyaml>=6.0

@@ -27,13 +27,10 @@ def check_dependencies():
         'flask': 'Flask',
         'cv2': 'OpenCV',
         'numpy': 'NumPy',
-        'PIL': 'Pillow',
         'ultralytics': 'Ultralytics',
         'pyttsx3': 'pyttsx3',
         'yaml': 'PyYAML'
     }
-
-    optional_packages = {}
 
     missing = []
     installed = []
@@ -48,15 +45,6 @@ def check_dependencies():
         except ImportError:
             print(f"  [!!] {name:20s} 未安装")
             missing.append(name)
-
-    # 检查可选包
-    print("\n可选依赖:")
-    for module, name in optional_packages.items():
-        try:
-            __import__(module)
-            print(f"  [OK] {name:20s} 已安装")
-        except ImportError:
-            print(f"  [--] {name:20s} 未安装（可选）")
 
     if missing:
         print(f"\n[警告] 缺少 {len(missing)} 个必需依赖: {', '.join(missing)}")

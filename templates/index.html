@@ -214,6 +214,18 @@
         }
         .chat-input-row input:focus { border-color: #667eea; }
         .chat-input-row button { flex: 0 0 auto; padding: 10px 18px; }
+        .mic-btn { flex: 0 0 auto; padding: 10px 14px !important; font-size: 16px; }
+        .mic-btn.listening { background: #eb3349; animation: pulse 1s infinite; }
+        .det-tag {
+            font-size: 11px;
+            background: rgba(255,255,255,0.12);
+            padding: 1px 6px;
+            border-radius: 6px;
+            margin-left: 4px;
+            white-space: nowrap;
+        }
+        .det-tag.warn { color: #f4a261; }
+        .det-tag.green { color: #38ef7d; }
         @media (max-width: 900px) {
             .main-container { flex-direction: column; }
             .control-panel { width: 100%; }
@@ -222,12 +234,12 @@
 </head>
 <body>
     <header class="header">
-        <div class="logo">
-            <div>
-                <h1>BlindGuard</h1>
-                <p>智能导盲系统 V1.0</p>
-            </div>
-        </div>
+                <div class="logo">
+                    <div>
+                        <h1>BlindGuard</h1>
+                        <p>智能导盲系统 V2.1 · 多模态感知智能体</p>
+                    </div>
+                </div>
     </header>
 
     <main class="main-container">
@@ -323,6 +335,7 @@
                 </div>
                 <div class="chat-input-row">
                     <input id="chatInput" type="text" placeholder="问我周围有什么..." onkeydown="if(event.key==='Enter')sendChat()">
+                    <button class="btn btn-secondary mic-btn" id="btnMic" onclick="toggleMic()" title="语音输入">🎤</button>
                     <button class="btn btn-primary" onclick="sendChat()">发送</button>
                 </div>
             </div>
@@ -560,8 +573,18 @@
                     const conf = (det.confidence * 100).toFixed(1);
                     const risk = det.risk_level || 'safe';
                     const name = det.class_name_cn || det.class_name || '未知';
+                    let tags = '';
+                    if (det.light_state && det.light_state !== 'unknown') {
+                        const lc = { red: '红灯', yellow: '黄灯', green: '绿灯' }[det.light_state];
+                        if (lc) {
+                            const cls = det.light_state === 'green' ? 'det-tag green' : 'det-tag warn';
+                            tags += `<span class="${cls}">${lc}</span>`;
+                        }
+                    }
+                    if (det.trend === 'approaching') tags += '<span class="det-tag warn">↑接近中</span>';
+                    else if (det.trend === 'receding') tags += '<span class="det-tag">↓远离</span>';
                     html += `<div class="detection-item">
-                        <div><b>${name}</b> (${conf}%)</div>
+                        <div><b>${name}</b> (${conf}%)${tags}</div>
                         <div class="risk-dot ${risk}"></div>
                     </div>`;
                 });
@@ -580,6 +603,35 @@
         function showMessage(text, type = 'info') {
             const area = document.getElementById('messageArea');
             area.innerHTML = `<div class="message ${type}">${text}</div>`;
+        }
+
+        // 语音输入（浏览器 Web Speech API，Chrome/Edge 可用，不支持时自动隐藏）
+        const SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recog = null;
+        if (SpeechRecog) {
+            recog = new SpeechRecog();
+            recog.lang = 'zh-CN';
+            recog.interimResults = false;
+            recog.maxAlternatives = 1;
+            recog.onresult = (e) => {
+                const text = e.results[0][0].transcript;
+                document.getElementById('chatInput').value = text;
+                sendChat();
+            };
+            recog.onend = () => document.getElementById('btnMic').classList.remove('listening');
+            recog.onerror = () => document.getElementById('btnMic').classList.remove('listening');
+        } else {
+            document.getElementById('btnMic').style.display = 'none';
+        }
+
+        function toggleMic() {
+            if (!recog) return;
+            const btn = document.getElementById('btnMic');
+            if (btn.classList.contains('listening')) { recog.stop(); return; }
+            try {
+                recog.start();
+                btn.classList.add('listening');
+            } catch (e) {}
         }
 
         // 智能对话
@@ -632,7 +684,9 @@
                     badge.textContent = '未启用';
                     badge.className = 'agent-badge off';
                 } else if (data.llm_active) {
-                    badge.textContent = data.model;
+                    let label = data.model;
+                    if (data.vision_active) label += ' · 视觉';
+                    badge.textContent = label;
                     badge.className = 'agent-badge on';
                 } else {
                     badge.textContent = '本地回退';

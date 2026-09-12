@@ -9,8 +9,10 @@
 """
 
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 from enum import Enum
+
+from core.labels import get_class_cn
 
 logger = logging.getLogger('BlindGuard.Risk')
 
@@ -30,12 +32,13 @@ class RiskEvaluator:
     基于多因素综合评估环境风险
     """
 
-    # 风险等级权重配置
+    # 风险等级权重配置（三项权重之和为 1.0，保证总分上限为 1）
+    # 此前定义了 movement_risk: 0.15 但从未参与计算，导致总分上限只有 0.85，
+    # "极高风险"(>=0.80) 几乎无法触发；运动趋势现由 tracker 提供给 Agent 使用
     RISK_WEIGHTS = {
-        'class_risk': 0.35,      # 目标类别风险权重
-        'distance_risk': 0.30,   # 距离风险权重
-        'position_risk': 0.20,   # 位置风险权重
-        'movement_risk': 0.15    # 运动风险权重
+        'class_risk': 0.45,      # 目标类别风险权重
+        'distance_risk': 0.35,   # 距离风险权重
+        'position_risk': 0.20    # 位置风险权重
     }
 
     # 目标类别基础风险分值 (0-1)
@@ -87,7 +90,8 @@ class RiskEvaluator:
     def __init__(self, risk_thresholds: Optional[Dict] = None,
                  high_risk_classes: Optional[List[str]] = None,
                  medium_risk_classes: Optional[List[str]] = None,
-                 low_risk_classes: Optional[List[str]] = None):
+                 low_risk_classes: Optional[List[str]] = None,
+                 class_mapping: Optional[Dict] = None):
         """
         初始化风险评估器
 
@@ -96,7 +100,10 @@ class RiskEvaluator:
             high_risk_classes: 高风险类别列表
             medium_risk_classes: 中风险类别列表
             low_risk_classes: 低风险类别列表
+            class_mapping: 类别英文->中文映射（来自 config.yaml class_mapping）
         """
+        self._class_mapping = dict(class_mapping) if class_mapping else {}
+
         # 应用自定义阈值
         if risk_thresholds:
             self._apply_custom_thresholds(risk_thresholds)
@@ -140,12 +147,14 @@ class RiskEvaluator:
         if 'distance' in thresholds:
             self.DISTANCE_THRESHOLDS.update(thresholds['distance'])
 
-    def evaluate(self, detections: List[Dict]) -> List[Dict]:
+    def evaluate(self, detections: List[Dict],
+                 frame_width: int = 640) -> List[Dict]:
         """
         评估检测结果的风险
 
         Args:
             detections: 检测结果列表
+            frame_width: 当前帧宽度（像素），用于方位/位置判断
 
         Returns:
             风险评估结果列表，每个结果包含:
@@ -162,7 +171,7 @@ class RiskEvaluator:
         risk_results = []
 
         for det in detections:
-            risk_result = self._evaluate_single(det)
+            risk_result = self._evaluate_single(det, frame_width)
             risk_results.append(risk_result)
 
         # 按风险分值排序
@@ -170,13 +179,12 @@ class RiskEvaluator:
 
         return risk_results
 
-    def _evaluate_single(self, detection: Dict) -> Dict:
+    def _evaluate_single(self, detection: Dict, frame_width: int = 640) -> Dict:
         """评估单个检测结果的风险"""
         # 提取检测信息
         class_name = detection.get('class_name', 'default')
         area_ratio = detection.get('area_ratio', 0)
         center = detection.get('center', (0, 0))
-        frame_width = 640  # 默认帧宽度
 
         # 计算各维度风险分值
         class_score = self._calculate_class_risk(class_name)
@@ -190,6 +198,11 @@ class RiskEvaluator:
             position_score * self.RISK_WEIGHTS['position_risk']
         )
 
+        # 红灯亮起：过马路场景的硬约束，额外加权
+        light_state = detection.get('light_state')
+        if light_state == 'red':
+            total_score = min(1.0, total_score + 0.15)
+
         # 确定风险等级
         risk_level = self._determine_risk_level(total_score)
 
@@ -201,10 +214,10 @@ class RiskEvaluator:
 
         # 生成警告消息
         warning_message = self._generate_warning(
-            class_name, risk_level, distance_level, position_zone
+            class_name, risk_level, distance_level, position_zone, light_state
         )
 
-        return {
+        result = {
             'class_name': class_name,
             'risk_level': risk_level.value,
             'risk_level_cn': self.level_names[risk_level],
@@ -221,6 +234,11 @@ class RiskEvaluator:
             'confidence': detection.get('confidence', 0),
             'area_ratio': area_ratio
         }
+        # 透传跟踪器/红绿灯的附加信息
+        for key in ('light_state', 'track_id', 'track_age', 'trend'):
+            if key in detection:
+                result[key] = detection[key]
+        return result
 
     def _calculate_class_risk(self, class_name: str) -> float:
         """
@@ -322,29 +340,14 @@ class RiskEvaluator:
             return 'right'
 
     def _generate_warning(self, class_name: str, risk_level: RiskLevel,
-                          distance_level: str, position_zone: str) -> str:
+                          distance_level: str, position_zone: str,
+                          light_state: Optional[str] = None) -> str:
         """
         生成警告消息
 
-        综合考虑目标类型、风险等级、距离和位置信息，
+        综合考虑目标类型、风险等级、距离、位置与红绿灯状态，
         生成自然语言警告消息。
         """
-        # 中文目标名称映射
-        class_names_cn = {
-            'person': '行人',
-            'car': '汽车',
-            'truck': '卡车',
-            'bus': '公交车',
-            'bicycle': '自行车',
-            'motorcycle': '摩托车',
-            'dog': '狗',
-            'traffic light': '红绿灯',
-            'stop sign': '停车标志',
-            'fire hydrant': '消防栓',
-            'bench': '长椅',
-            'pole': '电线杆'
-        }
-
         # 距离描述
         distance_desc = {
             'very_close': '非常近',
@@ -361,9 +364,15 @@ class RiskEvaluator:
             'right': '右侧'
         }
 
-        cn_name = class_names_cn.get(class_name, class_name)
+        cn_name = get_class_cn(class_name, self._class_mapping)
         dist_desc = distance_desc.get(distance_level, '')
         pos_desc = position_desc.get(position_zone, '')
+
+        # 红灯：给出通行约束而非障碍警告
+        if light_state == 'red':
+            return "红灯，请等待绿灯再通行"
+        if light_state == 'green':
+            return "绿灯，注意观察后可通行"
 
         # 根据风险等级生成不同紧急程度的警告
         if risk_level == RiskLevel.CRITICAL:

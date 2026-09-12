@@ -9,8 +9,10 @@
 """
 
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 from collections import Counter
+
+from core.labels import get_class_cn
 
 logger = logging.getLogger('BlindGuard.Scene')
 
@@ -30,14 +32,21 @@ class SceneAnalyzer:
         'dangerous': '危险场景'
     }
 
-    def __init__(self):
-        """初始化场景分析器"""
+    def __init__(self, class_mapping: Optional[Dict] = None):
+        """初始化场景分析器
+
+        Args:
+            class_mapping: 类别英文->中文映射（来自 config.yaml class_mapping）
+        """
+        self._class_mapping = dict(class_mapping) if class_mapping else {}
+
         # 目标类别分组
         self.category_groups = {
             'vehicle': {'car', 'truck', 'bus', 'motorcycle', 'bicycle'},
             'pedestrian': {'person'},
-            'traffic_sign': {'traffic light', 'stop sign', 'parking meter'},
-            'obstacle': {'fire hydrant', 'bench', 'chair', 'pole'},
+            'traffic_sign': {'traffic light', 'stop sign', 'parking meter',
+                             'traffic_light'},
+            'obstacle': {'fire hydrant', 'bench', 'chair', 'pole', 'public_facility'},
             'animal': {'dog', 'cat', 'bird', 'horse'},
             'movable': {'umbrella', 'handbag', 'suitcase', 'backpack'}
         }
@@ -67,11 +76,16 @@ class SceneAnalyzer:
         if not detections:
             return self._empty_scene_result()
 
+        # 帧宽度用于方位统计（传入 None 时退回默认 640）
+        frame_width = 640
+        if frame is not None and hasattr(frame, 'shape') and len(frame.shape) >= 2:
+            frame_width = max(1, frame.shape[1])
+
         # 目标分布分析
         distribution = self._analyze_distribution(detections)
 
         # 空间分析
-        spatial = self._analyze_spatial(detections)
+        spatial = self._analyze_spatial(detections, frame_width)
 
         # 运动分析
         movement = self._analyze_movement(detections)
@@ -152,7 +166,7 @@ class SceneAnalyzer:
             'total_count': total
         }
 
-    def _analyze_spatial(self, detections: List[Dict]) -> Dict:
+    def _analyze_spatial(self, detections: List[Dict], frame_width: int = 640) -> Dict:
         """
         空间分析
         分析目标在画面中的位置分布
@@ -161,10 +175,10 @@ class SceneAnalyzer:
         left_count = 0
         center_count = 0
         right_count = 0
+        frame_width = max(1, frame_width)
 
         for det in detections:
             center_x = det.get('center', (0, 0))[0]
-            frame_width = 640  # 默认帧宽度
 
             # 计算归一化位置
             normalized_x = center_x / frame_width
@@ -291,17 +305,7 @@ class SceneAnalyzer:
         main_objects = []
         for class_name, info in list(by_class.items())[:3]:
             count = info['count']
-            class_names_cn = {
-                'person': '行人',
-                'car': '汽车',
-                'truck': '卡车',
-                'bus': '公交车',
-                'bicycle': '自行车',
-                'motorcycle': '摩托车',
-                'dog': '狗',
-                'traffic light': '红绿灯'
-            }
-            cn_name = class_names_cn.get(class_name, class_name)
+            cn_name = get_class_cn(class_name, self._class_mapping)
             main_objects.append(f"{count}个{cn_name}")
 
         # 位置描述

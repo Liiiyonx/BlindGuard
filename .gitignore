@@ -16,6 +16,12 @@ logs/
 # 上传文件
 uploads/
 
+# 运行时用户数据（用户偏好记忆）
+data/
+
+# 私密配置（API Key）
+.env
+
 # IDE
 .vscode/
 .idea/
@@ -27,8 +33,3 @@ uploads/
 .DS_Store
 Thumbs.db
 desktop.ini
-uploads/
-logs/
-*.log
-__pycache__/
-.env

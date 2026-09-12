@@ -26,13 +26,6 @@ class DetectionEngine:
     封装YOLO模型，提供统一的检测接口
     """
 
-    # 默认检测类别（针对导盲场景优化）
-    PRIORITY_CLASSES = {
-        'person', 'car', 'truck', 'bus', 'bicycle', 'motorcycle',
-        'dog', 'cat', 'traffic light', 'stop sign', 'fire hydrant',
-        'bench', 'chair', 'umbrella', 'handbag', 'suitcase'
-    }
-
     def __init__(self, model_path: str = 'best.pt',
                  confidence_threshold: float = 0.5,
                  iou_threshold: float = 0.45,
@@ -120,11 +113,12 @@ class DetectionEngine:
         start_time = time.time()
 
         try:
-            # 执行推理
+            # 执行推理（imgsz 使用配置值，保证 config.yaml 的 img_size 实际生效）
             results = self.model.predict(
                 source=frame,
                 conf=self.conf_threshold,
                 iou=self.iou_threshold,
+                imgsz=self.img_size,
                 classes=classes,
                 verbose=False
             )
