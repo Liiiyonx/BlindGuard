@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon_192.png">
     <title>BlindGuard 智能导盲系统</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -48,6 +51,13 @@
             position: relative;
         }
         .video-container img { width: 100%; height: 100%; object-fit: contain; }
+        .overlay-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
 
         /* 视频控制栏 */
         .video-controls {
@@ -259,6 +269,8 @@
         .timeline-item.critical { border-left-color: #ff0040; }
         .timeline-item.high { border-left-color: #f45c43; }
         .timeline-item.medium { border-left-color: #f4a261; }
+        .timeline-item.seekable { cursor: pointer; }
+        .timeline-item.seekable:hover { background: rgba(102,126,234,0.18); }
         /* 快捷提问 chips */
         .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
         .chip {
@@ -301,6 +313,17 @@
             .main-container { flex-direction: column; }
             .control-panel { width: 100%; }
         }
+        @media (max-width: 600px) {
+            .header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+            .main-container { padding: 10px; gap: 12px; }
+            .panel-card { padding: 14px; }
+            .btn { padding: 12px 14px; font-size: 15px; }
+            .chip { padding: 8px 12px; font-size: 13px; }
+            .chat-box { max-height: 150px; }
+            .detection-list { max-height: 220px; }
+            .tool-btn { padding: 6px 10px; font-size: 12px; }
+            .mic-btn { font-size: 14px; }
+        }
     </style>
 </head>
 <body>
@@ -321,9 +344,12 @@
         <section class="video-section">
             <div class="video-header">
                 <h3>实时监控</h3>
+                <button class="tool-btn" id="btnOverlay" onclick="toggleOverlay()"
+                        aria-label="切换中文标签覆盖层">标签层: 开</button>
             </div>
-            <div class="video-container">
+            <div class="video-container" id="videoContainer">
                 <img id="videoFeed" src="/video_feed" alt="视频流">
+                <canvas id="overlay" class="overlay-canvas"></canvas>
             </div>
             <!-- 视频控制栏 -->
             <div class="video-controls" id="videoControls" style="display:none;">
@@ -612,13 +638,17 @@
                 // 场景类型
                 document.getElementById('sceneType').textContent = data.scene_type_cn || '-';
 
-                // 播报时间线
+                // 播报时间线（点击可回跳视频位置）
                 if (data.events) {
                     const tl = document.getElementById('timeline');
-                    tl.innerHTML = data.events.map(e =>
-                        `<div class="timeline-item ${e.level}"><span class="tl-time">${e.time}</span> · ${e.text}</div>`
-                    ).join('');
+                    tl.innerHTML = data.events.map((e) => {
+                        const cls = `timeline-item ${e.level}${e.frame ? ' seekable' : ''}`;
+                        const onclk = e.frame ? ` onclick="seekToFrame(${e.frame})"` : '';
+                        return `<div class="${cls}"${onclk}><span class="tl-time">${e.time}</span> · ${e.text}</div>`;
+                    }).join('');
                 }
+                window._fw = data.frame_w || window._fw;
+                window._fh = data.frame_h || window._fh;
 
                 // 最新播报
                 if (data.last_message) {
@@ -686,8 +716,9 @@
                         <div class="det-sub">置信度 ${conf}% · 风险分 ${score}${zone ? ' · ' + zone : ''}${dur}</div>
                     </div>`;
                 });
-                list.innerHTML = html;
-            } catch (e) {}
+                    list.innerHTML = html;
+                    drawOverlay(data.detections, window._fw, window._fh);
+                } catch (e) {}
         }
 
         function updateUI() {
@@ -703,33 +734,183 @@
             area.innerHTML = `<div class="message ${type}">${text}</div>`;
         }
 
-        // 语音输入（浏览器 Web Speech API，Chrome/Edge 可用，不支持时自动隐藏）
+        // ===== 语音输入：Web Speech API 优先，Whisper 浏览器内离线识别兜底 =====
         const SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recog = null;
+        let webSpeechOK = false;
         if (SpeechRecog) {
-            recog = new SpeechRecog();
-            recog.lang = 'zh-CN';
-            recog.interimResults = false;
-            recog.maxAlternatives = 1;
-            recog.onresult = (e) => {
-                const text = e.results[0][0].transcript;
-                document.getElementById('chatInput').value = text;
-                sendChat();
-            };
-            recog.onend = () => document.getElementById('btnMic').classList.remove('listening');
-            recog.onerror = () => document.getElementById('btnMic').classList.remove('listening');
-        } else {
-            document.getElementById('btnMic').style.display = 'none';
+            try {
+                recog = new SpeechRecog();
+                recog.lang = 'zh-CN';
+                recog.interimResults = false;
+                recog.maxAlternatives = 1;
+                recog.onresult = (e) => {
+                    document.getElementById('chatInput').value = e.results[0][0].transcript;
+                    sendChat();
+                };
+                recog.onend = () => setMicIdle();
+                recog.onerror = () => setMicIdle();
+                webSpeechOK = true;
+            } catch (e) {
+                webSpeechOK = false;
+            }
         }
 
-        function toggleMic() {
-            if (!recog) return;
+        function setMicStatus(text, listening = false) {
             const btn = document.getElementById('btnMic');
-            if (btn.classList.contains('listening')) { recog.stop(); return; }
+            btn.textContent = text || '🎤';
+            btn.classList.toggle('listening', listening);
+        }
+        function setMicIdle() { setMicStatus('🎤'); }
+
+        // Whisper：Transformers.js 浏览器内推理，模型经 hf-mirror 下载约 40MB（仅首次）
+        let whisperPipe = null;
+        let whisperLoading = false;
+        let whisperRec = null;
+
+        async function ensureWhisper() {
+            if (whisperPipe) return whisperPipe;
+            if (whisperLoading) return null;
+            whisperLoading = true;
             try {
-                recog.start();
-                btn.classList.add('listening');
+                setMicStatus('⏬ 模型…');
+                const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1');
+                mod.env.remoteHost = 'https://hf-mirror.com';
+                whisperPipe = await mod.pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+                    dtype: 'q8',
+                    progress_callback: (p) => {
+                        if (p.status === 'progress' && p.progress)
+                            setMicStatus(`⏬ ${Math.round(p.progress)}%`);
+                    },
+                });
+                return whisperPipe;
+            } catch (e) {
+                setMicStatus('🎤✗');
+                alert('语音模型加载失败（需联网下载约 40MB）：' + e.message);
+                return null;
+            } finally {
+                whisperLoading = false;
+            }
+        }
+
+        async function startWhisperRecord() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            const src = ctx.createMediaStreamSource(stream);
+            const proc = ctx.createScriptProcessor(4096, 1, 1);
+            const chunks = [];
+            proc.onaudioprocess = (e) => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+            src.connect(proc);
+            proc.connect(ctx.destination);
+            whisperRec = { ctx, stream, src, proc, chunks };
+        }
+
+        async function stopWhisperAndSend() {
+            const rec = whisperRec;
+            whisperRec = null;
+            try {
+                rec.proc.disconnect();
+                rec.src.disconnect();
+                rec.stream.getTracks().forEach((t) => t.stop());
+                await rec.ctx.close();
             } catch (e) {}
+            setMicStatus('🔎 识别中…');
+            let audio = new Float32Array(rec.chunks.reduce((n, c) => n + c.length, 0));
+            let off = 0;
+            for (const c of rec.chunks) { audio.set(c, off); off += c.length; }
+            try {
+                const out = await whisperPipe(audio, { language: 'chinese', task: 'transcribe' });
+                if (out.text && out.text.trim()) {
+                    document.getElementById('chatInput').value = out.text.trim();
+                    sendChat();
+                }
+            } catch (e) {
+                alert('语音识别失败：' + e.message);
+            }
+            setMicIdle();
+        }
+
+        async function toggleMic() {
+            const btn = document.getElementById('btnMic');
+            if (btn.classList.contains('listening')) {
+                if (whisperRec) { await stopWhisperAndSend(); return; }
+                if (recog) { recog.stop(); return; }
+            }
+            if (webSpeechOK) {
+                try { recog.start(); setMicStatus('🎤', true); } catch (e) {}
+                return;
+            }
+            const pipe = await ensureWhisper();
+            if (!pipe) return;
+            try {
+                await startWhisperRecord();
+                setMicStatus('🎙 点击结束', true);
+            } catch (e) {
+                alert('无法访问麦克风：' + e.message);
+                setMicIdle();
+            }
+        }
+
+        // ===== 检测框中文覆盖层（后端画英文框，前端叠加中文标签与风险填色） =====
+        let overlayOn = localStorage.getItem('bg_overlay') !== '0';
+        const RISK_COLORS_CSS = { critical: '#ff0040', high: '#f45c43', medium: '#f4a261', low: '#667eea', safe: '#38ef7d' };
+
+        function applyOverlay() {
+            document.getElementById('overlay').style.display = overlayOn ? 'block' : 'none';
+            document.getElementById('btnOverlay').textContent = '标签层: ' + (overlayOn ? '开' : '关');
+        }
+        function toggleOverlay() {
+            overlayOn = !overlayOn;
+            localStorage.setItem('bg_overlay', overlayOn ? '1' : '0');
+            applyOverlay();
+        }
+
+        function drawOverlay(dets, fw, fh) {
+            const canvas = document.getElementById('overlay');
+            const cont = document.getElementById('videoContainer');
+            const box = cont.getBoundingClientRect();
+            if (!box.width) return;
+            if (canvas.width !== Math.round(box.width) || canvas.height !== Math.round(box.height)) {
+                canvas.width = Math.round(box.width);
+                canvas.height = Math.round(box.height);
+            }
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!overlayOn || !dets || !dets.length || !fw || !fh) return;
+            const scale = Math.min(box.width / fw, box.height / fh);
+            const dx = (box.width - fw * scale) / 2;
+            const dy = (box.height - fh * scale) / 2;
+            ctx.font = '12px "Microsoft YaHei", sans-serif';
+            for (const det of dets) {
+                const bb = det.bbox || [0, 0, 0, 0];
+                if (bb.length < 4) continue;
+                const X1 = dx + bb[0] * scale, Y1 = dy + bb[1] * scale;
+                const X2 = dx + bb[2] * scale, Y2 = dy + bb[3] * scale;
+                const color = RISK_COLORS_CSS[det.risk_level] || '#38ef7d';
+                ctx.fillStyle = color + '22';
+                ctx.fillRect(X1, Y1, X2 - X1, Y2 - Y1);
+                const conf = Math.round((det.confidence || 0) * 100);
+                let label = `${det.class_name_cn || det.class_name || '?'} ${conf}%`;
+                if (det.light_state === 'red') label += ' 红灯';
+                else if (det.light_state === 'green') label += ' 绿灯';
+                if (det.trend === 'approaching') label += ' 接近中';
+                const tw = ctx.measureText(label).width + 10;
+                const ly = Math.max(16, Y1 - 6);
+                ctx.fillStyle = color;
+                ctx.fillRect(X1, ly - 14, tw, 18);
+                ctx.fillStyle = '#0a0a14';
+                ctx.fillText(label, X1 + 5, ly);
+            }
+        }
+
+        function seekToFrame(f) {
+            if (!videoActive) { showMessage('回跳仅支持视频模式', 'info'); return; }
+            fetch('/api/video/seek', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ frame: f })
+            });
+            showMessage('已回跳到事件发生位置', 'info');
         }
 
         // 大字高对比模式（低视力用户，localStorage 记忆）
@@ -822,7 +1003,11 @@
         document.addEventListener('DOMContentLoaded', () => {
             updateUI();
             updateAgentStatus();
+            applyOverlay();
             setInterval(updateAgentStatus, 3000);
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            }
         });
     </script>
 </body>

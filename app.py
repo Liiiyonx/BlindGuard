@@ -13,7 +13,7 @@ import time
 import logging
 import threading
 from collections import deque
-from flask import Flask, render_template, Response, jsonify, request
+from flask import Flask, render_template, Response, jsonify, request, send_from_directory
 import cv2
 import numpy as np
 
@@ -257,6 +257,16 @@ class BlindGuardApp:
         self.app.add_url_rule('/api/detections', 'detections', self._get_detections)
         self.app.add_url_rule('/api/chat', 'chat', self._chat, methods=['POST'])
         self.app.add_url_rule('/api/agent/status', 'agent_status', self._agent_status)
+        # PWA
+        self.app.add_url_rule('/manifest.json', 'manifest',
+                              lambda: send_from_directory('static', 'manifest.json'))
+        self.app.add_url_rule('/sw.js', 'sw',
+                              lambda: send_from_directory('static', 'sw.js',
+                                                          mimetype='application/javascript'))
+        self.app.add_url_rule('/icon_192.png', 'icon192',
+                              lambda: send_from_directory('static', 'icon_192.png'))
+        self.app.add_url_rule('/icon_512.png', 'icon512',
+                              lambda: send_from_directory('static', 'icon_512.png'))
 
     def _index(self):
         return render_template('index.html')
@@ -386,10 +396,13 @@ class BlindGuardApp:
                 now = time.time()
                 if now - self.last_speak_time >= self.agent.announce_cooldown:
                     self.last_speak_time = now
+                    with self.video_lock:
+                        frame_pos = int(self.video_cap.get(cv2.CAP_PROP_POS_FRAMES)) \
+                            if self.video_cap else 0
                     threading.Thread(
                         target=self._async_announce,
                         args=(list(announce_dets), self.overall_risk,
-                              frame_w, frame_h, time.time()),
+                              frame_w, frame_h, time.time(), frame_pos),
                         daemon=True
                     ).start()
 
@@ -496,6 +509,8 @@ class BlindGuardApp:
             'scene_type_cn': self.scene_info.get('scene_type_cn', ''),
             'last_message': self.last_message,
             'events': list(self.events)[-8:][::-1],
+            'frame_w': self._frame_size[0],
+            'frame_h': self._frame_size[1],
         })
 
     def _cam_start(self):
@@ -590,7 +605,7 @@ class BlindGuardApp:
             return jsonify({'detections': list(self.detections)})
 
     # ==================== 智能体相关 ====================
-    def _async_announce(self, dets, risk, frame_w, frame_h, t_frame_done=None):
+    def _async_announce(self, dets, risk, frame_w, frame_h, t_frame_done=None, frame_pos=0):
         """后台线程：调用智能体生成播报，完成后送入语音队列，并统计端到端延迟"""
         try:
             text = self.agent.generate_announcement(dets, risk, frame_w, frame_h)
@@ -602,7 +617,7 @@ class BlindGuardApp:
                 logger.info(f"智能体播报: {text}")
                 self.last_message = text
                 self.events.append({'time': time.strftime('%H:%M:%S'),
-                                    'text': text, 'level': risk})
+                                    'text': text, 'level': risk, 'frame': frame_pos})
                 priority = RISK_VOICE_PRIORITY.get(risk, VoiceAnnouncer.PRIORITY_MEDIUM)
                 self.voice.speak(text, priority=priority)
         except Exception as e:
