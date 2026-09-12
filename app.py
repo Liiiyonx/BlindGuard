@@ -12,6 +12,7 @@ import os
 import time
 import logging
 import threading
+from collections import deque
 from flask import Flask, render_template, Response, jsonify, request
 import cv2
 import numpy as np
@@ -218,6 +219,10 @@ class BlindGuardApp:
         # 最近一条播报，供前端展示
         self.last_message = "系统就绪，请启动系统开始检测"
         self.overall_risk = 'safe'
+        # 播报事件时间线（Frigate 式事件流：供前端时间线面板回看）
+        self.events = deque(maxlen=50)
+        self.events.append({'time': time.strftime('%H:%M:%S'),
+                            'text': '系统就绪', 'level': 'safe'})
         # 最近一次播报的端到端延迟（检测帧完成 -> 播报文本生成）
         self.last_announce_latency_ms = None
 
@@ -490,6 +495,7 @@ class BlindGuardApp:
             'scene_type': self.scene_info.get('scene_type', ''),
             'scene_type_cn': self.scene_info.get('scene_type_cn', ''),
             'last_message': self.last_message,
+            'events': list(self.events)[-8:][::-1],
         })
 
     def _cam_start(self):
@@ -595,6 +601,8 @@ class BlindGuardApp:
                                 f"(LLM={'在线' if self.agent.llm_ok else '离线模板'})")
                 logger.info(f"智能体播报: {text}")
                 self.last_message = text
+                self.events.append({'time': time.strftime('%H:%M:%S'),
+                                    'text': text, 'level': risk})
                 priority = RISK_VOICE_PRIORITY.get(risk, VoiceAnnouncer.PRIORITY_MEDIUM)
                 self.voice.speak(text, priority=priority)
         except Exception as e:

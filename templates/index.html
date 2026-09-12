@@ -226,6 +226,77 @@
         }
         .det-tag.warn { color: #f4a261; }
         .det-tag.green { color: #38ef7d; }
+        .conf-bar {
+            height: 5px;
+            background: rgba(255,255,255,0.12);
+            border-radius: 3px;
+            margin-top: 6px;
+            overflow: hidden;
+            width: 130px;
+        }
+        .conf-bar i {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #38ef7d);
+            border-radius: 3px;
+        }
+        .det-sub { font-size: 11px; opacity: 0.65; margin-top: 4px; }
+        /* 播报时间线（参考 Frigate 事件流） */
+        .timeline {
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .timeline-item {
+            padding: 6px 10px;
+            border-left: 3px solid #667eea;
+            background: rgba(255,255,255,0.04);
+            border-radius: 0 6px 6px 0;
+            margin-bottom: 5px;
+        }
+        .timeline-item .tl-time { font-size: 10px; opacity: 0.5; }
+        .timeline-item.critical { border-left-color: #ff0040; }
+        .timeline-item.high { border-left-color: #f45c43; }
+        .timeline-item.medium { border-left-color: #f4a261; }
+        /* 快捷提问 chips */
+        .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .chip {
+            font-size: 12px;
+            padding: 5px 10px;
+            background: rgba(102,126,234,0.18);
+            border: 1px solid rgba(102,126,234,0.4);
+            border-radius: 14px;
+            color: #c5cae9;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .chip:hover { background: rgba(102,126,234,0.35); color: #fff; }
+        /* 头部工具按钮 */
+        .header-tools { display: flex; gap: 10px; align-items: center; }
+        .tool-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .tool-btn:hover { background: rgba(255,255,255,0.2); }
+        /* 高对比度大字模式（低视力用户 / WCAG AA） */
+        body.hc {
+            background: #000 !important;
+            font-size: 18px;
+        }
+        body.hc .panel-card, body.hc .header, body.hc .video-header { background: #0a0a0a !important; border: 2px solid #ffe600; }
+        body.hc .status-value, body.hc .message, body.hc .chat-msg, body.hc .detection-item, body.hc .det-sub { color: #ffe600 !important; font-size: 17px; }
+        body.hc .message.warning, body.hc .det-tag.warn { color: #ff5252 !important; }
+        body.hc .conf-bar { height: 8px; background: #333; }
+        body.hc .conf-bar i { background: #ffe600; }
+        body.hc .timeline-item { color: #ffe600; }
+        body.hc .chip { color: #ffe600; border-color: #ffe600; }
+        body.hc h1, body.hc h3 { color: #ffe600; }
         @media (max-width: 900px) {
             .main-container { flex-direction: column; }
             .control-panel { width: 100%; }
@@ -234,12 +305,16 @@
 </head>
 <body>
     <header class="header">
-                <div class="logo">
-                    <div>
-                        <h1>BlindGuard</h1>
-                        <p>智能导盲系统 V2.1 · 多模态感知智能体</p>
-                    </div>
-                </div>
+        <div class="logo">
+            <div>
+                <h1>BlindGuard</h1>
+                <p>智能导盲系统 V2.2.1 · 多模态感知智能体</p>
+            </div>
+        </div>
+        <div class="header-tools">
+            <button class="tool-btn" id="btnContrast" onclick="toggleContrast()"
+                    aria-label="切换高对比度大字模式">👁 大字模式</button>
+        </div>
     </header>
 
     <main class="main-container">
@@ -314,9 +389,10 @@
 
             <div class="panel-card">
                 <h3>警告信息</h3>
-                <div class="message-area" id="messageArea">
+                <div class="message-area" id="messageArea" aria-live="polite">
                     <div class="message info">系统就绪，请启动系统开始检测</div>
                 </div>
+                <div class="timeline" id="timeline" aria-label="播报时间线"></div>
             </div>
 
             <div class="panel-card">
@@ -330,13 +406,20 @@
                 <h3>智能对话
                     <span class="agent-badge off" id="agentBadge">本地回退</span>
                 </h3>
-                <div class="chat-box" id="chatBox">
+                <div class="chat-box" id="chatBox" role="log" aria-label="对话记录">
                     <div class="chat-msg bot"><div class="role">导盲助手</div>你好，我可以回答你周围环境的问题，例如"前面有什么"</div>
                 </div>
+                <div class="chip-row" id="chipRow">
+                    <button class="chip" onclick="quickAsk('前面有什么')">前面有什么</button>
+                    <button class="chip" onclick="quickAsk('现在能过马路吗')">现在能过马路吗</button>
+                    <button class="chip" onclick="quickAsk('周围有什么危险')">周围有什么危险</button>
+                    <button class="chip" onclick="quickAsk('读一下路牌上的字')">读一下路牌上的字</button>
+                </div>
                 <div class="chat-input-row">
-                    <input id="chatInput" type="text" placeholder="问我周围有什么..." onkeydown="if(event.key==='Enter')sendChat()">
-                    <button class="btn btn-secondary mic-btn" id="btnMic" onclick="toggleMic()" title="语音输入">🎤</button>
-                    <button class="btn btn-primary" onclick="sendChat()">发送</button>
+                    <input id="chatInput" type="text" placeholder="问我周围有什么... (按 / 聚焦)"
+                           aria-label="输入问题" onkeydown="if(event.key==='Enter')sendChat()">
+                    <button class="btn btn-secondary mic-btn" id="btnMic" onclick="toggleMic()" title="语音输入" aria-label="语音输入">🎤</button>
+                    <button class="btn btn-primary" onclick="sendChat()" aria-label="发送">发送</button>
                 </div>
             </div>
         </aside>
@@ -529,6 +612,14 @@
                 // 场景类型
                 document.getElementById('sceneType').textContent = data.scene_type_cn || '-';
 
+                // 播报时间线
+                if (data.events) {
+                    const tl = document.getElementById('timeline');
+                    tl.innerHTML = data.events.map(e =>
+                        `<div class="timeline-item ${e.level}"><span class="tl-time">${e.time}</span> · ${e.text}</div>`
+                    ).join('');
+                }
+
                 // 最新播报
                 if (data.last_message) {
                     showMessage(data.last_message, risk === 'critical' || risk === 'high' ? 'warning' : 'info');
@@ -572,7 +663,10 @@
                 data.detections.forEach(det => {
                     const conf = (det.confidence * 100).toFixed(1);
                     const risk = det.risk_level || 'safe';
+                    const score = det.risk_score != null ? (det.risk_score * 100).toFixed(0) : '-';
                     const name = det.class_name_cn || det.class_name || '未知';
+                    const zone = { left: '左侧', center: '正前方', right: '右侧' }[det.position_zone] || '';
+                    const dur = det.track_age != null ? ` · 已出现 ${det.track_age}s` : '';
                     let tags = '';
                     if (det.light_state && det.light_state !== 'unknown') {
                         const lc = { red: '红灯', yellow: '黄灯', green: '绿灯' }[det.light_state];
@@ -583,9 +677,13 @@
                     }
                     if (det.trend === 'approaching') tags += '<span class="det-tag warn">↑接近中</span>';
                     else if (det.trend === 'receding') tags += '<span class="det-tag">↓远离</span>';
-                    html += `<div class="detection-item">
-                        <div><b>${name}</b> (${conf}%)${tags}</div>
-                        <div class="risk-dot ${risk}"></div>
+                    html += `<div class="detection-item" style="display:block">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <div><b>${name}</b>${tags}</div>
+                            <div class="risk-dot ${risk}"></div>
+                        </div>
+                        <div class="conf-bar" title="置信度 ${conf}%"><i style="width:${conf}%"></i></div>
+                        <div class="det-sub">置信度 ${conf}% · 风险分 ${score}${zone ? ' · ' + zone : ''}${dur}</div>
                     </div>`;
                 });
                 list.innerHTML = html;
@@ -633,6 +731,32 @@
                 btn.classList.add('listening');
             } catch (e) {}
         }
+
+        // 大字高对比模式（低视力用户，localStorage 记忆）
+        function toggleContrast() {
+            document.body.classList.toggle('hc');
+            localStorage.setItem('bg_hc', document.body.classList.contains('hc') ? '1' : '0');
+        }
+        if (localStorage.getItem('bg_hc') === '1') {
+            document.body.classList.add('hc');
+        }
+
+        // 快捷提问
+        function quickAsk(q) {
+            document.getElementById('chatInput').value = q;
+            sendChat();
+        }
+
+        // 键盘快捷键：/ 聚焦提问框，Esc 离开
+        document.addEventListener('keydown', (e) => {
+            const input = document.getElementById('chatInput');
+            if (e.key === '/' && document.activeElement !== input) {
+                e.preventDefault();
+                input.focus();
+            } else if (e.key === 'Escape' && document.activeElement === input) {
+                input.blur();
+            }
+        });
 
         // 智能对话
         async function sendChat() {
