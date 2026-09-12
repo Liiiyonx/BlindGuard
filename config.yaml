@@ -36,6 +36,8 @@ detector:
     - "public_facility"
     - "tactile_paving"
   aux_img_size: 640         # 辅助模型推理尺寸（旧模型按 640 训练，与主模型独立）
+  portrait_crop: true       # 竖屏帧裁掉上10%/下20%再检测（天空/自身无目标，等效分辨率+49%，
+                            # 检出框坐标自动回映全帧），横屏帧不受影响
 
 # 危险判断引擎配置（阈值可调）
 risk_engine:

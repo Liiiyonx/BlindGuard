@@ -133,6 +133,8 @@ class BlindGuardApp:
         focus_names = model_cfg.get('focus_classes') or []
         name2id = {v: k for k, v in self.detector.get_class_names().items()}
         self._focus_class_ids = [name2id[n] for n in focus_names if n in name2id] or None
+        # 竖屏帧中心裁剪开关
+        self._portrait_crop = bool(model_cfg.get('portrait_crop', False))
 
         # 辅助检测引擎（定制类专家：井盖/盲道/公共设施），未配置则单模型
         self.aux_detector = None
@@ -346,7 +348,26 @@ class BlindGuardApp:
             self._frame_size = (frame_w, frame_h)
 
             # --- 管线：检测(主+辅) → 红绿灯状态 → 跟踪 → 风险 → 场景 ---
-            detections = self.detector.detect(frame, classes=self._focus_class_ids)
+            # 竖屏帧中心裁剪：letterbox 会把竖屏宽度压到不足一半，
+            # 裁掉天空/自身区带后等效分辨率提升约 49%，坐标回映全帧
+            crop_top, crop_bot = 0, frame_h
+            do_crop = self._portrait_crop and frame_h > frame_w * 1.3
+            if do_crop:
+                crop_top = int(frame_h * 0.10)
+                crop_bot = int(frame_h * 0.80)
+            detect_img = frame[crop_top:crop_bot, :] if do_crop else frame
+
+            detections = self.detector.detect(detect_img, classes=self._focus_class_ids)
+            if do_crop:
+                area_back = (crop_bot - crop_top) / frame_h  # 面积占比还原到全帧口径
+                for det in detections:
+                    if len(det.get('bbox', [])) >= 4:
+                        det['bbox'] = [det['bbox'][0], det['bbox'][1] + crop_top,
+                                       det['bbox'][2], det['bbox'][3] + crop_top]
+                        cy = det.get('center')
+                        if cy:
+                            det['center'] = (cy[0], cy[1] + crop_top)
+                    det['area_ratio'] = det.get('area_ratio', 0) * area_back
             if self.aux_detector is not None:
                 aux_dets = self.aux_detector.detect(frame, classes=self._aux_class_ids)
                 detections = self._merge_detections(detections, aux_dets)
