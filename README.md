@@ -49,7 +49,8 @@ BlindGuard/
 ├── run.py                    # 启动脚本（含环境检查）
 ├── smoke_test.py             # 冒烟测试脚本
 ├── test_agent_tools.py       # 工具调用循环端到端测试（本地模拟 LLM）
-├── evaluate.py               # 答辩指标评测（perf/accuracy/light/bootstrap）
+├── evaluate.py               # 答辩指标评测（perf/accuracy/light/bootstrap/collect）
+├── train.py                  # 模型重训练脚本（数据集yaml驱动，训练后自动评测对比）
 ├── config.yaml               # 唯一配置文件（检测/风险/语音/Agent/视觉）
 ├── .env                      # 私密配置（API Key，已 gitignore）
 ├── requirements.txt          # 依赖清单
@@ -68,7 +69,8 @@ BlindGuard/
 │   └── index.html            # Web 界面（监控 + 语音对话）
 ├── docs/                     # 答辩与产品文档
 │   ├── 演示脚本.md            # 90 秒演示流程与翻车预案
-│   └── 用户测试方案.md        # 志愿者内测方案与记录表
+│   ├── 用户测试方案.md        # 志愿者内测方案与记录表
+│   └── 重训练指南.md          # 数据采集/标注/训练/验收/上线全流程
 ├── logs/                     # 日志目录
 └── uploads/                  # 视频上传目录
 ```
@@ -162,6 +164,7 @@ python evaluate.py accuracy --data data_eval.yaml   # mAP / 各类别 AP
 > **已完成的评测结论**（详见 `evaluation/metrics_report.md`）：CPU 推理 10.4 FPS、检测占耗时 90%；
 > 人工抽检发现录屏素材与训练数据存在明显域差距（行人误检为 car、前景手套误检为 bicycle），
 > 据此已将置信度阈值上调至 0.6，并列出以第一人称实拍数据重训的改进路线。
+> **模型重训完整流程见 `docs/重训练指南.md`**（新数据集需补"行人"类，这是当前最大的能力缺口）。
 
 ## 配置说明（config.yaml）
 
