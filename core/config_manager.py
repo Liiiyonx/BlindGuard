@@ -265,10 +265,6 @@ class ConfigManager:
                 'cooldown': announcer.get('cooldown', 3.0)
             }
 
-        # 保留类别映射
-        if 'class_mapping' in config:
-            config['class_mapping'] = config['class_mapping']
-
     def _load_from_env(self):
         """从环境变量加载配置（显式映射，见 ENV_KEYS）"""
         for env_key, (config_key, caster) in self.ENV_KEYS.items():

@@ -191,6 +191,8 @@ class BlindGuardApp:
         # 最近一条播报，供前端展示
         self.last_message = "系统就绪，请启动系统开始检测"
         self.overall_risk = 'safe'
+        # 最近一次播报的端到端延迟（检测帧完成 -> 播报文本生成）
+        self.last_announce_latency_ms = None
 
         self._register_routes()
         # 单实例检测管线线程：随进程常驻，空闲时低成本休眠
@@ -343,15 +345,16 @@ class BlindGuardApp:
                 self._latest_jpeg = jpg.tobytes()
                 self._latest_raw = frame
 
-            # 语音播报（智能体驱动，异步生成，不阻塞管线）
-            if enriched and not self._generating:
+            # 语音播报（分级保守策略过滤后触发，异步生成不阻塞管线）
+            announce_dets = self.agent.should_announce(enriched)
+            if announce_dets and not self._generating:
                 now = time.time()
                 if now - self.last_speak_time >= self.agent.announce_cooldown:
                     self.last_speak_time = now
-                    dets_snapshot = list(enriched)
                     threading.Thread(
                         target=self._async_announce,
-                        args=(dets_snapshot, self.overall_risk, frame_w, frame_h),
+                        args=(list(announce_dets), self.overall_risk,
+                              frame_w, frame_h, time.time()),
                         daemon=True
                     ).start()
 
@@ -525,11 +528,15 @@ class BlindGuardApp:
             return jsonify({'detections': list(self.detections)})
 
     # ==================== 智能体相关 ====================
-    def _async_announce(self, dets, risk, frame_w, frame_h):
-        """后台线程：调用智能体生成播报，完成后送入语音队列"""
+    def _async_announce(self, dets, risk, frame_w, frame_h, t_frame_done=None):
+        """后台线程：调用智能体生成播报，完成后送入语音队列，并统计端到端延迟"""
         try:
             text = self.agent.generate_announcement(dets, risk, frame_w, frame_h)
             if text:
+                if t_frame_done is not None:
+                    self.last_announce_latency_ms = round((time.time() - t_frame_done) * 1000)
+                    logger.info(f"播报端到端延迟: {self.last_announce_latency_ms}ms "
+                                f"(LLM={'在线' if self.agent.llm_ok else '离线模板'})")
                 logger.info(f"智能体播报: {text}")
                 self.last_message = text
                 priority = RISK_VOICE_PRIORITY.get(risk, VoiceAnnouncer.PRIORITY_MEDIUM)
@@ -560,7 +567,10 @@ class BlindGuardApp:
             return jsonify({'success': False, 'message': f'对话失败: {e}'})
 
     def _agent_status(self):
-        return jsonify(self.agent.status())
+        status = self.agent.status()
+        if self.last_announce_latency_ms is not None:
+            status['announce_latency_ms'] = self.last_announce_latency_ms
+        return jsonify(status)
 
     def run(self):
         server_cfg = self.config.get_section('server')

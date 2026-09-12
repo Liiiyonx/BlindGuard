@@ -49,6 +49,7 @@ BlindGuard/
 ├── run.py                    # 启动脚本（含环境检查）
 ├── smoke_test.py             # 冒烟测试脚本
 ├── test_agent_tools.py       # 工具调用循环端到端测试（本地模拟 LLM）
+├── evaluate.py               # 答辩指标评测（perf/accuracy/light/bootstrap）
 ├── config.yaml               # 唯一配置文件（检测/风险/语音/Agent/视觉）
 ├── .env                      # 私密配置（API Key，已 gitignore）
 ├── requirements.txt          # 依赖清单
@@ -65,6 +66,9 @@ BlindGuard/
 │   └── agent.py              # 智能体（LLM 工具调用 + 记忆 + 对话 + VLM）
 ├── templates/
 │   └── index.html            # Web 界面（监控 + 语音对话）
+├── docs/                     # 答辩与产品文档
+│   ├── 演示脚本.md            # 90 秒演示流程与翻车预案
+│   └── 用户测试方案.md        # 志愿者内测方案与记录表
 ├── logs/                     # 日志目录
 └── uploads/                  # 视频上传目录
 ```
@@ -105,6 +109,19 @@ BlindGuard/
 - 整体风险等级（后端综合评估）、场景类型
 - 智能对话面板（含 LLM 在线状态徽章）
 
+## 产品定位与安全边界
+
+**价值主张**：与"用户举手机拍照"的被动式助盲工具（Seeing AI / Be My Eyes 等）不同，BlindGuard 是**主动式**的——系统持续感知环境，按风险等级主动语音预警，并针对中国道路定制了通用模型不认识的井盖、盲道类别。
+
+**安全边界（重要）**：
+- 本系统是**辅助感知工具，不是安全认证设备**：输出的是"提示"而非"指令"，不能替代盲杖、导盲犬或人的判断；
+- 播报采取保守策略：低风险等级（low/safe）与低置信度目标不主动播报（可配置 `agent.announce.min_level` / `min_confidence`），**宁可漏报，不误报**；
+- 红绿灯灯色不确定时（逆光/遮挡）系统保持沉默，而非猜测。
+
+**隐私原则**：目标检测与风险评估全部本地完成；仅当用户主动提问且配置了视觉端点时，才按需上传单帧画面给 VLM，未配置则该功能完全关闭。
+
+**路线图**：① 当前形态（演示平台）→ ② 手机 App + 语音优先交互 + 视障志愿者内测（见 `docs/用户测试方案.md`）→ ③ 与无障碍生态合作（残联/厂商/公益）。
+
 ## 快速开始
 
 ### 1. 安装依赖
@@ -129,10 +146,16 @@ python app.py
 ### 4. 访问界面
 打开浏览器访问：http://localhost:5000
 
-### 5. 自检
+### 5. 自检与评测
 ```bash
-python smoke_test.py        # 冒烟测试：模块/Agent/跟踪/红绿灯/偏好/接口全链路
-python test_agent_tools.py  # 工具调用循环测试（本地模拟 LLM，无需真实 Key）
+python smoke_test.py                  # 冒烟测试：模块/Agent/跟踪/红绿灯/偏好/接口全链路
+python test_agent_tools.py            # 工具调用循环测试（本地模拟 LLM，无需真实 Key）
+
+python evaluate.py perf               # 推理性能：各阶段耗时/FPS/CPU内存/播报延迟
+python evaluate.py light --synthetic 60    # 红绿灯识别自检；有真实裁剪图用 --dir
+python evaluate.py bootstrap          # 从视频抽帧+伪标签，人工校正后生成测试集
+python evaluate.py accuracy --data data_eval.yaml   # mAP / 各类别 AP
+# 结果写入 evaluation/metrics_report.md，答辩可直接引用
 ```
 
 ## 配置说明（config.yaml）
@@ -200,6 +223,13 @@ agent:               # 智能体
 | 安全 | 🟢 绿色 | 可正常通行 | - |
 
 ## 版本历史
+
+### V2.1.1 (2026)
+- 播报分级保守策略：低于 medium 等级或置信度阈值的目标不主动播报（宁可漏报不误报）
+- 端到端播报延迟埋点，暴露于 /api/agent/status
+- 新增 evaluate.py 评测脚本：推理性能/延迟、模型 mAP、红绿灯识别准确率、测试集 bootstrap
+- 新增 docs/：演示脚本（含翻车预案）、用户测试方案
+- README 新增产品定位与安全边界章节
 
 ### V2.1 (2026)
 - 智能体升级为真正的 Agent：Function Calling 工具调用（查检测/查场景/查记忆/看图/读写偏好）

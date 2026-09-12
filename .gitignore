@@ -19,6 +19,9 @@ uploads/
 # 运行时用户数据（用户偏好记忆）
 data/
 
+# 评测数据集（抽帧图片较大，报告 metrics_report.md 可保留）
+evaluation/dataset/
+
 # 私密配置（API Key）
 .env
 

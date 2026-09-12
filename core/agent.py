@@ -125,6 +125,9 @@ class BlindGuardAgent:
         ann = config.get('announce', {}) or {}
         self.announce_cooldown = float(ann.get('cooldown', 3.0))
         self.memory_size = int(ann.get('memory_size', 8))
+        # 主动播报的保守策略（分级告警）：低于该等级/置信度的目标不主动播报
+        self.min_level = str(ann.get('min_level', 'medium'))
+        self.min_confidence = float(ann.get('min_confidence', 0.45))
 
         chat = config.get('chat', {}) or {}
         self.max_history = int(chat.get('max_history', 6))
@@ -247,6 +250,22 @@ class BlindGuardAgent:
         return '\n'.join(lines)
 
     # ==================== 播报生成 ====================
+
+    def should_announce(self, detections: List[Dict]) -> List[Dict]:
+        """
+        主动播报的保守过滤（分级告警策略）：
+        - 风险等级低于 min_level（如 low/safe）不主动播报，用户可主动查询
+        - 置信度低于 min_confidence 的目标不播报——宁可漏报，不误报
+        """
+        min_order = RISK_ORDER.get(self.min_level, 2)
+        result = []
+        for d in detections:
+            if RISK_ORDER.get(d.get('risk_level', 'safe'), 4) > min_order:
+                continue
+            if float(d.get('confidence', 0)) < self.min_confidence:
+                continue
+            result.append(d)
+        return result
 
     def generate_announcement(self, detections: List[Dict],
                               risk_level: str = 'safe',

@@ -119,6 +119,14 @@ try:
     print(f"  [OK] 应用初始化完成，模型类别: {list(names.values())}")
     print(f"  [OK] 核心模块接入: detector/risk/scene/tracker/light/profile/agent")
     print(f"  [OK] Agent 接入: llm_ok={app_obj.agent.llm_ok} vlm_ok={app_obj.agent.vlm_ok}")
+    # 播报分级保守策略：low 等级与低置信度应被过滤
+    sample = [{'risk_level': 'high', 'confidence': 0.9},
+              {'risk_level': 'low', 'confidence': 0.9},
+              {'risk_level': 'critical', 'confidence': 0.2}]
+    kept = app_obj.agent.should_announce(sample)
+    assert len(kept) == 1 and kept[0]['risk_level'] == 'high', \
+        f"分级策略应只保留 high 一条，实际 {len(kept)} 条"
+    print("  [OK] 播报分级策略: low 等级与低置信度目标已过滤")
 except Exception as e:
     print(f"  [FAIL] 应用初始化失败: {e}")
     import traceback; traceback.print_exc()

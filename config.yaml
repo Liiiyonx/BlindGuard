@@ -98,6 +98,8 @@ agent:
   announce:
     cooldown: 3.0           # 播报冷却（秒），避免每帧都调 LLM
     memory_size: 8          # 时序记忆滑动窗口帧数
+    min_level: "medium"     # 主动播报最低风险等级：low/safe 目标只可查询不主动播报（分级告警）
+    min_confidence: 0.45    # 低于该置信度的目标不主动播报（宁可漏报不误报）
   chat:
     max_history: 6          # 对话保留的历史轮数
 
