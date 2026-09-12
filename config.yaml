@@ -11,18 +11,21 @@ camera:
 
 # YOLOv10 检测模型配置
 detector:
-  # 主模型：通用交通类（person/car/bicycle/traffic_light）
-  # best_v2.pt = COCO val2017 2926 张 GPU 微调版（runs/detect/blindguard_v2/weights/best.pt）
-  model_path: "best_v2.pt"
+  # 主模型：通用交通类（v3 = COCO train2017 全量 3.5 万张 7 类 GPU 重训）
+  # 训练产物 runs/detect/blindguard_v3/weights/best.pt 已复制为 best_v3.pt
+  model_path: "best_v3.pt"
   confidence: 0.6           # 置信度阈值（抽检证据：0.53-0.73 区间误检集中，宁漏勿误）
   iou_threshold: 0.45       # IoU 阈值（可调）
   device: ""                # 推理设备：""=自动(有GPU用GPU), "cpu", "cuda:0"
   img_size: 640             # 推理图像尺寸
-  # 主模型只检测这些类别（与主模型类别命名一致，降低无关误检）
+  # 主模型只检测这些类别（与主模型 7 类一一对应）
   focus_classes:
     - "person"
-    - "car"
     - "bicycle"
+    - "car"
+    - "motorcycle"
+    - "bus"
+    - "truck"
     - "traffic_light"
   # 辅助模型：定制类专家（井盖/盲道/公共设施）。留空 "" 关闭双模型
   aux_model_path: "best.pt"

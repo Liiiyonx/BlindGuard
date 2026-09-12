@@ -232,6 +232,15 @@ agent:               # 智能体
 
 ## 版本历史
 
+### V2.2 (2026)
+- 模型全面重训 v3：COCO train2017 全量 35,000 张真值、7 类（新增 motorcycle/bus/truck），
+  mAP50 40.4 → **58.3**（person 63.5→73.2，car 39.9→58.7，bicycle +18.7，traffic_light +10.9）
+- GPU 训练全流程落地：PyTorch cu128 离线安装、train2017 六段并行下载与断点补拉、
+  分段虚拟拼接抽取（免 20GB 解压空间）
+- 部署验证：行人+真车同时正确检出（旧模型该帧仅有人→car 假阳性）
+- 旧 best.pt 转为定制类辅助模型（井盖/盲道/公共设施白名单），主辅 IoU 去重合并
+- build_dataset_v3.py / fetch_remainder.py / train.py(--workers) 工具链入库
+
 ### V2.1.3 (2026)
 - 发现并修复 PyTorch CPU 构建：离线安装 cu128 轮子，RTX 5060 首次可用于训练与推理
 - 检测升级为双模型：主模型 best_v2.pt（COCO 真值 2926 张 GPU 微调，person AP50=63.5）
