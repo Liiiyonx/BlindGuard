@@ -39,6 +39,8 @@ def main():
     parser.add_argument('--device', default='', help="'0' GPU / 'cpu' / '' 自动")
     parser.add_argument('--name', default='blindguard_v2', help='本次训练的运行名')
     parser.add_argument('--patience', type=int, default=30, help='早停耐心轮数')
+    parser.add_argument('--workers', type=int, default=4,
+                        help='DataLoader 工作进程数；Windows 下 8 易崩，建议 4 或 2')
     args = parser.parse_args()
 
     if not os.path.exists(args.data):
@@ -52,6 +54,8 @@ def main():
     print("=" * 60)
 
     model = YOLOModel(args.weights)
+    import cv2
+    cv2.setNumThreads(0)  # 避免 Windows 下 DataLoader 工作进程内 OpenCV 线程冲突崩溃
     model.train(
         data=args.data,
         epochs=args.epochs,
@@ -60,6 +64,7 @@ def main():
         device=args.device,
         patience=args.patience,
         name=args.name,
+        workers=args.workers,
         plots=True,       # 训练曲线/混淆矩阵输出到 runs/detect/<name>/
     )
 
@@ -76,7 +81,9 @@ def main():
     print(f"  新模型 mAP@0.5 = {box.map50 * 100:.1f}")
     print(f"  新模型 mAP@0.5:0.95 = {box.map * 100:.1f}")
     names = metrics.names or {}
-    for i, cls_idx in enumerate(getattr(box, 'ap_class_index', []) or []):
+    ap_idx = getattr(box, 'ap_class_index', None)
+    ap_idx = list(ap_idx) if ap_idx is not None else []
+    for i, cls_idx in enumerate(ap_idx):
         print(f"    {names.get(int(cls_idx), cls_idx):16s} AP50 = {box.ap50[i] * 100:.1f}")
 
     print("\n上线步骤:")

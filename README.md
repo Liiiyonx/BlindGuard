@@ -232,6 +232,15 @@ agent:               # 智能体
 
 ## 版本历史
 
+### V2.1.3 (2026)
+- 发现并修复 PyTorch CPU 构建：离线安装 cu128 轮子，RTX 5060 首次可用于训练与推理
+- 检测升级为双模型：主模型 best_v2.pt（COCO 真值 2926 张 GPU 微调，person AP50=63.5）
+  负责通用类，原 best.pt 白名单仅输出定制类（井盖/盲道/公共设施），主优先 IoU 去重
+- 行人误检为 car 的核心缺陷修复（抽检帧 2085：car 0.57 → person 0.9）
+- 推理提速：RTX 5060 双模型 28.8ms/帧（≈35 FPS），此前 CPU 单模型 75ms
+- build_dataset.py（COCO 转换/井盖定位/伪标注）与 train.py（--workers/--resume 适配 Windows）
+- 修复 ConfigManager 丢弃 detector 扩展键、train.py numpy 打印 bug
+
 ### V2.1.2 (2026)
 - evaluate.py 新增 collect 模式（人工抽检帧 + 红绿灯裁剪图采集）
 - 修复检测输出中的 numpy 类型（无法 JSON 序列化）

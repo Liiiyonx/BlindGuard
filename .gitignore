@@ -16,6 +16,12 @@ logs/
 # 上传文件
 uploads/
 
+# 训练数据与产物（大文件，报告在 evaluation/ 可保留）
+downloads/
+dataset/
+runs/
+training.log
+
 # 运行时用户数据（用户偏好记忆）
 data/
 
