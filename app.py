@@ -144,7 +144,7 @@ class BlindGuardApp:
                     confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
                     iou_threshold=model_cfg.get('iou_threshold', 0.45),
                     device=model_cfg.get('device', ''),
-                    img_size=model_cfg.get('img_size', 640),
+                    img_size=model_cfg.get('aux_img_size', 640),
                 )
                 aux_names = model_cfg.get('aux_classes') or []
                 aux_name2id = {v: k for k, v in self.aux_detector.get_class_names().items()}

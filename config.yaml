@@ -11,14 +11,14 @@ camera:
 
 # YOLOv10 检测模型配置
 detector:
-  # 主模型：通用交通类（v3 = COCO train2017 全量 3.5 万张 7 类 GPU 重训）
-  # 训练产物 runs/detect/blindguard_v3/weights/best.pt 已复制为 best_v3.pt
-  model_path: "best_v3.pt"
+  # 主模型：通用交通类（v4 = v3 的 960px 高分辨率微调版，专攻远处小目标）
+  # 训练产物 runs/detect/blindguard_v4/weights/best.pt 已复制为 best_v4.pt
+  model_path: "best_v4.pt"
   confidence: 0.5           # 置信度阈值（v3 阈值扫描：0.5 时精确率 91.5%/召回 41.0%，
                             # 0.6 为 94%/35.6%——导盲场景漏检比误报更危险，取 0.5 平衡点）
   iou_threshold: 0.45       # IoU 阈值（可调）
   device: ""                # 推理设备：""=自动(有GPU用GPU), "cpu", "cuda:0"
-  img_size: 640             # 推理图像尺寸
+  img_size: 960             # 主模型推理尺寸（960 提升远处小目标红绿灯召回，速度约 18FPS）
   # 主模型只检测这些类别（与主模型 7 类一一对应）
   focus_classes:
     - "person"
@@ -35,6 +35,7 @@ detector:
     - "manhole_cover"
     - "public_facility"
     - "tactile_paving"
+  aux_img_size: 640         # 辅助模型推理尺寸（旧模型按 640 训练，与主模型独立）
 
 # 危险判断引擎配置（阈值可调）
 risk_engine:
