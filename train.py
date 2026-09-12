@@ -20,6 +20,9 @@ import os
 import shutil
 import sys
 
+# 显存碎片化缓解（Windows 桌面共享 GPU 时尤其实用）
+os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', 'expandable_segments:True')
+
 try:
     from ultralytics import YOLOv10 as YOLOModel
 except ImportError:
