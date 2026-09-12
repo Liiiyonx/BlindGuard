@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-BlindGuard 智能导盲系统 V1.0
+BlindGuard 智能导盲系统 V2.0
+
+架构：检测引擎 → 风险评估器 → 场景分析器 → 智能体(LLM) → 语音播报器
+各层由 core/ 下独立模块实现，本文件只负责装配与调度。
 """
 import os
 import time
@@ -9,68 +12,57 @@ import threading
 from flask import Flask, render_template, Response, jsonify, request
 import cv2
 import numpy as np
-from ultralytics import YOLO
-import pyttsx3
+
+from core.config_manager import ConfigManager
+from core.detection_engine import DetectionEngine
+from core.risk_evaluator import RiskEvaluator
+from core.scene_analyzer import SceneAnalyzer
+from core.voice_announcer import VoiceAnnouncer
+from core.agent import BlindGuardAgent, load_agent_config
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger('BlindGuard')
 
-# ==================== 语音播报（与原系统相同） ====================
-speech_lock = threading.Lock()
-_engine = None
+# 风险等级 -> 绘制颜色 (BGR)
+RISK_COLORS = {
+    'critical': (0, 0, 255),      # 红
+    'high': (0, 69, 255),         # 橙红
+    'medium': (0, 165, 255),      # 橙
+    'low': (255, 200, 0),         # 蓝
+    'safe': (0, 255, 0),          # 绿
+}
 
-def get_engine():
-    global _engine
-    if _engine is None:
-        _engine = pyttsx3.init()
-        _engine.setProperty('rate', 150)
-        _engine.setProperty('volume', 1.0)
-        # 设置中文语音
-        voices = _engine.getProperty('voices')
-        for voice in voices:
-            if 'chinese' in voice.name.lower() or 'zh' in voice.id.lower():
-                _engine.setProperty('voice', voice.id)
-                logger.info(f"使用中文语音: {voice.name}")
-                break
-    return _engine
+# 风险等级 -> 语音播报优先级
+RISK_VOICE_PRIORITY = {
+    'critical': VoiceAnnouncer.PRIORITY_CRITICAL,
+    'high': VoiceAnnouncer.PRIORITY_HIGH,
+    'medium': VoiceAnnouncer.PRIORITY_MEDIUM,
+    'low': VoiceAnnouncer.PRIORITY_LOW,
+    'safe': VoiceAnnouncer.PRIORITY_LOW,
+}
 
-def speak_async(text):
-    logger.info(f"准备播报: {text}")
-    def speak_task():
-        logger.info(f"播报线程启动: {text}")
-        with speech_lock:
-            try:
-                engine = get_engine()
-                engine.stop()
-                engine.say(text)
-                engine.runAndWait()
-                logger.info(f"播报完成: {text}")
-            except RuntimeError as e:
-                if "run loop already started" in str(e):
-                    logger.warning(f"语音循环冲突，重试: {e}")
-                    engine.stop()
-                    engine.say(text)
-                    engine.runAndWait()
-            except Exception as e:
-                logger.error(f"语音播报异常: {e}")
-    threading.Thread(target=speak_task, daemon=True).start()
 
 # ==================== 摄像头 ====================
 class Camera:
-    def __init__(self):
+    def __init__(self, device_id=0, width=640, height=480):
+        self.device_id = device_id
+        self.width = width
+        self.height = height
         self.cap = None
         self.frame = None
         self.running = False
         self.lock = threading.Lock()
 
-    def open(self, device_id=0):
+    def open(self, device_id=None):
+        if device_id is None:
+            device_id = self.device_id
         self.cap = cv2.VideoCapture(device_id, cv2.CAP_DSHOW)
         if not self.cap.isOpened():
             self.cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
         if not self.cap.isOpened():
             return False
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         self.running = True
         ret, f = self.cap.read()
         if ret:
@@ -96,20 +88,60 @@ class Camera:
             self.cap.release()
             self.cap = None
 
+
 # ==================== 主应用 ====================
 class BlindGuardApp:
-    def __init__(self):
+    def __init__(self, config_path='config.yaml'):
         self.app = Flask(__name__)
-        self.camera = Camera()
-        self.detector = YOLO("best.pt")
-        logger.info(f"模型加载: {self.detector.names}")
 
-        # 类别映射
-        self.class_names = {
-            0: ('car', '汽车'), 1: ('bicycle', '自行车'),
-            2: ('manhole_cover', '井盖'), 3: ('public_facility', '公共设施'),
-            4: ('tactile_paving', '盲道'), 5: ('traffic_light', '红绿灯')
-        }
+        # 配置
+        self.config = ConfigManager(config_path)
+
+        # 摄像头
+        cam_cfg = self.config.get_section('camera')
+        self.camera = Camera(
+            device_id=cam_cfg.get('device_id', 0),
+            width=cam_cfg.get('width', 640),
+            height=cam_cfg.get('height', 480),
+        )
+
+        # 检测引擎
+        model_cfg = self.config.get_section('model')
+        self.detector = DetectionEngine(
+            model_path=model_cfg.get('path', 'best.pt'),
+            confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
+            iou_threshold=model_cfg.get('iou_threshold', 0.45),
+            device=model_cfg.get('device', ''),
+            img_size=model_cfg.get('img_size', 640),
+        )
+        logger.info(f"模型加载: {self.detector.get_class_names()}")
+
+        # 风险评估器（yaml 的 area_thresholds 对应 RiskEvaluator 的 distance 阈值）
+        risk_cfg = self.config.get_section('risk')
+        self.risk = RiskEvaluator(
+            risk_thresholds={'distance': risk_cfg.get('thresholds', {})},
+            high_risk_classes=risk_cfg.get('high_risk_classes'),
+            medium_risk_classes=risk_cfg.get('medium_risk_classes'),
+            low_risk_classes=risk_cfg.get('low_risk_classes'),
+        )
+
+        # 场景分析器
+        self.scene = SceneAnalyzer()
+
+        # 语音播报器
+        voice_cfg = self.config.get_section('voice')
+        self.voice = VoiceAnnouncer(
+            rate=voice_cfg.get('rate', 180),
+            volume=voice_cfg.get('volume', 1.0),
+            cooldown=voice_cfg.get('cooldown', 3.0),
+        )
+        self.voice.start()
+
+        # 类别中英文映射
+        self.class_mapping = self.config.get('class_mapping', {}) or {}
+
+        # 智能体（LLM 推理 + 时序记忆 + 对话）
+        self.agent = BlindGuardAgent(load_agent_config(config_path))
 
         # 状态
         self.running = False
@@ -118,11 +150,25 @@ class BlindGuardApp:
         self.video_speed = 1.0
         self.video_paused = False
         self.detections = []
+        self.scene_info = {}
         self.fps = 0
         self.last_speak_time = 0
 
+        # 检测结果读写锁（视频流线程写、聊天/状态读）
+        self.detections_lock = threading.Lock()
+        # 播报生成并发控制，避免 LLM 调用堆积
+        self._gen_lock = threading.Lock()
+        self._generating = False
+        # 最近一条播报，供前端展示
+        self.last_message = "系统就绪，请启动系统开始检测"
+        self.overall_risk = 'safe'
+
         self._register_routes()
         logger.info("系统初始化完成")
+        if self.agent.llm_ok:
+            logger.info(f"智能体已接入 LLM: {self.agent.model}")
+        else:
+            logger.info("智能体未接入 LLM，使用模板播报 + 本地对话（在 .env 配置 BLINDGUARD_AGENT_LLM_API_KEY 启用）")
 
     def _register_routes(self):
         self.app.add_url_rule('/', 'index', self._index)
@@ -139,10 +185,13 @@ class BlindGuardApp:
         self.app.add_url_rule('/api/video/pause', 'pause', self._pause, methods=['POST'])
         self.app.add_url_rule('/api/video/resume', 'resume', self._resume, methods=['POST'])
         self.app.add_url_rule('/api/detections', 'detections', self._get_detections)
+        self.app.add_url_rule('/api/chat', 'chat', self._chat, methods=['POST'])
+        self.app.add_url_rule('/api/agent/status', 'agent_status', self._agent_status)
 
     def _index(self):
         return render_template('index.html')
 
+    # ==================== 视频流与检测管线 ====================
     def _video_feed(self):
         return Response(self._stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
@@ -171,60 +220,42 @@ class BlindGuardApp:
                 time.sleep(0.05)
                 continue
 
-            # 检测（置信度0.5，与原项目相同）
-            results = self.detector(frame, conf=0.5, verbose=False)
-            self.detections = []
-            logger.info(f"检测到 {len(results[0].boxes) if results and len(results) > 0 else 0} 个目标")
+            frame_h, frame_w = frame.shape[:2]
 
-            for r in results:
-                for box in r.boxes:
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
-                    conf = float(box.conf[0])
-                    cls_id = int(box.cls[0])
+            # --- 管线：检测 → 风险 → 场景 ---
+            detections = self.detector.detect(frame)
+            risk_results = self.risk.evaluate(detections)
+            enriched = self._enrich_detections(risk_results)
+            overall = self.risk.get_overall_risk(risk_results)
+            self.scene_info = self.scene.analyze(frame, detections)
 
-                    if cls_id in self.class_names:
-                        en_name, cn_name = self.class_names[cls_id]
-                    else:
-                        en_name, cn_name = f'class_{cls_id}', f'类别{cls_id}'
+            with self.detections_lock:
+                self.detections = enriched
+            self.overall_risk = overall['overall_level']
 
-                    # 风险等级
-                    if en_name in ['car', 'bicycle', 'truck', 'bus']:
-                        risk = 'high'
-                        color = (0, 0, 255)
-                    elif en_name in ['manhole_cover', 'tactile_paving', 'traffic_light']:
-                        risk = 'medium'
-                        color = (0, 165, 255)
-                    else:
-                        risk = 'low'
-                        color = (0, 255, 0)
+            # 绘制检测框
+            for det in enriched:
+                x1, y1, x2, y2 = det['bbox']
+                color = RISK_COLORS.get(det['risk_level'], (0, 255, 0))
+                label = f"{det['class_name_cn']} {det['confidence']:.0%}"
+                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(frame, label, (x1, y1 - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-                    self.detections.append({
-                        'bbox': [int(x1), int(y1), int(x2), int(y2)],
-                        'class_name': en_name,
-                        'class_name_cn': cn_name,
-                        'confidence': conf,
-                        'risk_level': risk
-                    })
+            # 智能体：每帧更新时序记忆（不含 LLM，开销小）
+            self.agent.update_memory(enriched, self.overall_risk, frame_w, frame_h)
 
-                    # 绘制
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(frame, f"{cn_name} {conf:.0%}", (x1, y1-5),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-
-            # 语音播报
-            if self.detections:
+            # 语音播报（智能体驱动，异步生成，不阻塞视频流）
+            if enriched and not self._generating:
                 now = time.time()
-                logger.info(f"检测到 {len(self.detections)} 个目标，距上次播报: {now - self.last_speak_time:.1f}秒")
-                if now - self.last_speak_time >= 3.0:
-                    best = max(self.detections, key=lambda x: x['confidence'])
-                    msg = f"前方有{best['class_name_cn']}"
-                    if best['risk_level'] == 'high':
-                        msg = f"危险！{msg}"
-                    elif best['risk_level'] == 'medium':
-                        msg = f"注意！{msg}"
+                if now - self.last_speak_time >= self.agent.announce_cooldown:
                     self.last_speak_time = now
-                    logger.info(f"触发播报: {msg}")
-                    speak_async(msg)
+                    dets_snapshot = list(enriched)
+                    threading.Thread(
+                        target=self._async_announce,
+                        args=(dets_snapshot, self.overall_risk),
+                        daemon=True
+                    ).start()
 
             # FPS
             frame_count += 1
@@ -234,28 +265,40 @@ class BlindGuardApp:
                 last_time = time.time()
 
             cv2.putText(frame, f"FPS: {self.fps}", (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
             _, jpg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
             yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + jpg.tobytes() + b'\r\n'
             time.sleep(1 / (30 * self.video_speed if self.video_cap else 30))
 
+    def _enrich_detections(self, risk_results):
+        """为风险评估结果补充中文艺名等前端所需字段"""
+        enriched = []
+        for r in risk_results:
+            det = dict(r)
+            det['class_name_cn'] = self.class_mapping.get(
+                det['class_name'], det['class_name'])
+            enriched.append(det)
+        return enriched
+
     # ==================== API ====================
     def _start(self):
         self.running = True
-        speak_async("智能导盲系统已启动")
+        self.voice.speak_system("智能导盲系统已启动")
         return jsonify({'success': True, 'message': '系统启动成功'})
 
     def _stop(self):
         self.running = False
         self._stop_camera()
         self._stop_video()
-        speak_async("智能导盲系统已停止")
+        self.voice.speak_system("智能导盲系统已停止")
         return jsonify({'success': True, 'message': '系统已停止'})
 
     def _status(self):
         pos = int(self.video_cap.get(cv2.CAP_PROP_POS_FRAMES)) if self.video_cap else 0
         total = int(self.video_cap.get(cv2.CAP_PROP_FRAME_COUNT)) if self.video_cap else 0
+        with self.detections_lock:
+            det_count = len(self.detections)
         return jsonify({
             'running': self.running,
             'camera_active': self.camera_active,
@@ -265,7 +308,11 @@ class BlindGuardApp:
             'video_total': total,
             'video_speed': self.video_speed,
             'fps': self.fps,
-            'detection_count': len(self.detections)
+            'detection_count': det_count,
+            'overall_risk': self.overall_risk,
+            'scene_type': self.scene_info.get('scene_type', ''),
+            'scene_type_cn': self.scene_info.get('scene_type_cn', ''),
+            'last_message': self.last_message,
         })
 
     def _cam_start(self):
@@ -276,13 +323,13 @@ class BlindGuardApp:
         self._stop_video()
         if self.camera.open():
             self.camera_active = True
-            speak_async("摄像头已开启")
+            self.voice.speak_system("摄像头已开启")
             return jsonify({'success': True, 'message': '摄像头启动成功'})
         return jsonify({'success': False, 'message': '无法打开摄像头'})
 
     def _cam_stop(self):
         self._stop_camera()
-        speak_async("摄像头已关闭")
+        self.voice.speak_system("摄像头已关闭")
         return jsonify({'success': True, 'message': '摄像头已关闭'})
 
     def _stop_camera(self):
@@ -307,12 +354,12 @@ class BlindGuardApp:
         self.running = True
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         logger.info(f"视频已加载: {path}, 总帧数: {total}")
-        speak_async("视频已加载，开始检测")
+        self.voice.speak_system("视频已加载，开始检测")
         return jsonify({'success': True, 'message': '视频上传成功', 'total_frames': total})
 
     def _video_stop(self):
         self._stop_video()
-        speak_async("视频播放已停止")
+        self.voice.speak_system("视频播放已停止")
         return jsonify({'success': True, 'message': '视频已停止'})
 
     def _stop_video(self):
@@ -333,29 +380,82 @@ class BlindGuardApp:
         data = request.get_json()
         speed = data.get('speed', 1.0)
         self.video_speed = max(0.25, min(4.0, speed))
-        speak_async(f"播放倍速{self.video_speed}倍")
+        self.voice.speak_system(f"播放倍速{self.video_speed}倍")
         return jsonify({'success': True, 'speed': self.video_speed})
 
     def _pause(self):
         self.video_paused = True
-        speak_async("视频已暂停")
+        self.voice.speak_system("视频已暂停")
         return jsonify({'success': True})
 
     def _resume(self):
         self.video_paused = False
-        speak_async("视频继续播放")
+        self.voice.speak_system("视频继续播放")
         return jsonify({'success': True})
 
     def _get_detections(self):
-        return jsonify({'detections': self.detections})
+        with self.detections_lock:
+            return jsonify({'detections': list(self.detections)})
+
+    # ==================== 智能体相关 ====================
+    def _async_announce(self, dets, risk):
+        """后台线程：调用智能体生成播报，完成后送入语音队列"""
+        with self._gen_lock:
+            if self._generating:
+                return
+            self._generating = True
+        try:
+            text = self.agent.generate_announcement(dets, risk, 640, 480)
+            if text:
+                logger.info(f"智能体播报: {text}")
+                self.last_message = text
+                priority = RISK_VOICE_PRIORITY.get(risk, VoiceAnnouncer.PRIORITY_MEDIUM)
+                self.voice.speak(text, priority=priority)
+        except Exception as e:
+            logger.error(f"智能体播报异常: {e}")
+        finally:
+            self._generating = False
+
+    def _chat(self):
+        data = request.get_json(silent=True) or {}
+        question = (data.get('message') or data.get('q') or '').strip()
+        if not question:
+            return jsonify({'success': False, 'message': '请输入问题'})
+        with self.detections_lock:
+            dets = list(self.detections)
+        risk = self.overall_risk
+        try:
+            reply = self.agent.chat(question, dets, risk, 640, 480)
+            logger.info(f"用户问: {question} | Agent答: {reply}")
+            return jsonify({
+                'success': True,
+                'reply': reply,
+                'llm_active': self.agent.llm_ok,
+                'detection_count': len(dets)
+            })
+        except Exception as e:
+            logger.error(f"对话异常: {e}")
+            return jsonify({'success': False, 'message': f'对话失败: {e}'})
+
+    def _agent_status(self):
+        return jsonify(self.agent.status())
 
     def run(self):
-        self.app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+        server_cfg = self.config.get_section('server')
+        host = server_cfg.get('host', '0.0.0.0')
+        port = server_cfg.get('port', 5000)
+        try:
+            self.app.run(host=host, port=port, debug=False, threaded=True)
+        finally:
+            self.voice.stop()
+            self._stop_camera()
+            self._stop_video()
+
 
 if __name__ == '__main__':
     os.makedirs('uploads', exist_ok=True)
     print("=" * 50)
-    print("BlindGuard 智能导盲系统 V1.0")
+    print("BlindGuard 智能导盲系统 V2.0")
     print("=" * 50)
     print("正在初始化...")
     app = BlindGuardApp()

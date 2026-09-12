@@ -92,6 +92,7 @@ class SceneAnalyzer:
             'movement_analysis': movement,
             'summary': summary,
             'object_count': len(detections),
+            'detections': detections,
             'timestamp': self._get_timestamp()
         }
 

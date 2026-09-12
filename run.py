@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-BlindGuard 智能导盲系统 V1.0 - 启动脚本
+BlindGuard 智能导盲系统 V2.0 - 启动脚本
 
 使用方法：
     python run.py
@@ -29,12 +29,11 @@ def check_dependencies():
         'numpy': 'NumPy',
         'PIL': 'Pillow',
         'ultralytics': 'Ultralytics',
-        'pyttsx3': 'pyttsx3'
-    }
-
-    optional_packages = {
+        'pyttsx3': 'pyttsx3',
         'yaml': 'PyYAML'
     }
+
+    optional_packages = {}
 
     missing = []
     installed = []
@@ -134,7 +133,7 @@ def start_server():
         print("按 Ctrl+C 停止服务器\n")
 
         # 启动服务器
-        app.run(host='0.0.0.0', port=5000, debug=False)
+        app.run()
 
     except KeyboardInterrupt:
         print("\n\n服务器已停止")
@@ -150,7 +149,7 @@ def start_server():
 def main():
     """主函数"""
     print("\n" + "=" * 60)
-    print("   BlindGuard 智能导盲系统 V1.0")
+    print("   BlindGuard 智能导盲系统 V2.0")
     print("=" * 60)
 
     # 检查依赖

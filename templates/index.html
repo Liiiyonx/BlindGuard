@@ -148,6 +148,8 @@
         .risk-dot.low { background: #667eea; box-shadow: 0 0 10px #667eea; }
         .risk-dot.medium { background: #f4a261; box-shadow: 0 0 10px #f4a261; }
         .risk-dot.high { background: #f45c43; box-shadow: 0 0 10px #f45c43; }
+        .risk-dot.critical { background: #ff0040; box-shadow: 0 0 14px #ff0040; animation: pulse 0.8s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
         .detection-list { max-height: 300px; overflow-y: auto; }
         .detection-item {
             display: flex;
@@ -177,6 +179,41 @@
         }
         .upload-area:hover { border-color: #667eea; }
         .upload-area input { display: none; }
+        /* 智能对话面板 */
+        .agent-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        .agent-badge.on { background: rgba(56,239,125,0.2); color: #38ef7d; }
+        .agent-badge.off { background: rgba(244,92,67,0.2); color: #f45c43; }
+        .chat-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .chat-msg { font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
+        .chat-msg.user { color: #667eea; text-align: right; }
+        .chat-msg.bot { color: #fff; }
+        .chat-msg .role { font-size: 11px; opacity: 0.5; margin-bottom: 2px; }
+        .chat-input-row { display: flex; gap: 8px; }
+        .chat-input-row input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+        .chat-input-row input:focus { border-color: #667eea; }
+        .chat-input-row button { flex: 0 0 auto; padding: 10px 18px; }
         @media (max-width: 900px) {
             .main-container { flex-direction: column; }
             .control-panel { width: 100%; }
@@ -256,6 +293,10 @@
                         <div class="status-label">风险等级</div>
                         <div class="status-value" id="riskLevel">安全</div>
                     </div>
+                    <div style="margin-left:auto;text-align:right">
+                        <div class="status-label">场景</div>
+                        <div class="status-value" id="sceneType" style="font-size:16px">-</div>
+                    </div>
                 </div>
             </div>
 
@@ -270,6 +311,19 @@
                 <h3>检测结果</h3>
                 <div class="detection-list" id="detectionList">
                     <div class="message info">暂无检测结果</div>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h3>智能对话
+                    <span class="agent-badge off" id="agentBadge">本地回退</span>
+                </h3>
+                <div class="chat-box" id="chatBox">
+                    <div class="chat-msg bot"><div class="role">导盲助手</div>你好，我可以回答你周围环境的问题，例如"前面有什么"</div>
+                </div>
+                <div class="chat-input-row">
+                    <input id="chatInput" type="text" placeholder="问我周围有什么..." onkeydown="if(event.key==='Enter')sendChat()">
+                    <button class="btn btn-primary" onclick="sendChat()">发送</button>
                 </div>
             </div>
         </aside>
@@ -453,6 +507,20 @@
                 document.getElementById('fpsValue').textContent = Math.round(data.fps || 0);
                 document.getElementById('objectCount').textContent = data.detection_count || 0;
 
+                // 整体风险等级（由后端 RiskEvaluator 综合评估）
+                const risk = data.overall_risk || 'safe';
+                document.getElementById('riskDot').className = 'risk-dot ' + risk;
+                const names = { safe: '安全', low: '低风险', medium: '中等风险', high: '高风险', critical: '极高风险' };
+                document.getElementById('riskLevel').textContent = names[risk] || '安全';
+
+                // 场景类型
+                document.getElementById('sceneType').textContent = data.scene_type_cn || '-';
+
+                // 最新播报
+                if (data.last_message) {
+                    showMessage(data.last_message, risk === 'critical' || risk === 'high' ? 'warning' : 'info');
+                }
+
                 // 更新视频进度
                 if (data.video_active) {
                     const pos = data.video_position || 0;
@@ -498,13 +566,6 @@
                     </div>`;
                 });
                 list.innerHTML = html;
-
-                if (data.detections.length > 0) {
-                    const topRisk = data.detections[0].risk_level || 'safe';
-                    document.getElementById('riskDot').className = 'risk-dot ' + topRisk;
-                    const names = { safe: '安全', low: '低风险', medium: '中等风险', high: '高风险' };
-                    document.getElementById('riskLevel').textContent = names[topRisk] || '安全';
-                }
             } catch (e) {}
         }
 
@@ -521,7 +582,70 @@
             area.innerHTML = `<div class="message ${type}">${text}</div>`;
         }
 
-        document.addEventListener('DOMContentLoaded', updateUI);
+        // 智能对话
+        async function sendChat() {
+            const input = document.getElementById('chatInput');
+            const q = input.value.trim();
+            if (!q) return;
+            input.value = '';
+            appendChat('user', q);
+            appendChat('bot', '思考中...');
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: q })
+                });
+                const data = await res.json();
+                // 替换"思考中..."
+                const box = document.getElementById('chatBox');
+                box.lastChild.remove();
+                if (data.success) {
+                    appendChat('bot', data.reply);
+                } else {
+                    appendChat('bot', '抱歉，出错了：' + data.message);
+                }
+            } catch (e) {
+                const box = document.getElementById('chatBox');
+                box.lastChild.remove();
+                appendChat('bot', '网络错误：' + e.message);
+            }
+        }
+
+        function appendChat(role, text) {
+            const box = document.getElementById('chatBox');
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + role;
+            const label = role === 'user' ? '我' : '导盲助手';
+            div.innerHTML = `<div class="role">${label}</div>${text}`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // 智能体状态轮询
+        async function updateAgentStatus() {
+            try {
+                const res = await fetch('/api/agent/status');
+                const data = await res.json();
+                const badge = document.getElementById('agentBadge');
+                if (!data.enabled) {
+                    badge.textContent = '未启用';
+                    badge.className = 'agent-badge off';
+                } else if (data.llm_active) {
+                    badge.textContent = data.model;
+                    badge.className = 'agent-badge on';
+                } else {
+                    badge.textContent = '本地回退';
+                    badge.className = 'agent-badge off';
+                }
+            } catch (e) {}
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateUI();
+            updateAgentStatus();
+            setInterval(updateAgentStatus, 3000);
+        });
     </script>
 </body>
 </html>

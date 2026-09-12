@@ -22,3 +22,6 @@ pandas>=2.0.0
 # 日志和工具
 colorlog>=6.7.0
 python-dotenv>=1.0.0
+
+# 配置文件（agent/检测/风险等全部配置生效必需）
+pyyaml>=6.0

@@ -35,6 +35,7 @@ risk_engine:
     - "bicycle"
     - "train"
     - "fire hydrant"
+    - "manhole_cover"       # 井盖（缺失/破损对视障人士极其危险）
 
   # 中等危险类别（障碍物）
   medium_risk_classes:
@@ -49,6 +50,8 @@ risk_engine:
     - "umbrella"
     - "stop sign"
     - "parking meter"
+    - "public_facility"     # 公共设施（可能形成障碍）
+    - "traffic_light"       # 红绿灯（需要关注通行信号）
 
   # 低危类别（一般物品）
   low_risk_classes:
@@ -62,6 +65,7 @@ risk_engine:
     - "tv"
     - "remote"
     - "clock"
+    - "tactile_paving"      # 盲道（引导设施，本身非障碍）
 
 # 语音播报配置
 announcer:
@@ -69,6 +73,27 @@ announcer:
   rate: 180                 # 语速（pyttsx3 专用）
   volume: 1.0               # 音量 0.0 - 1.0
   cooldown: 3.0             # 相同内容播报冷却时间（秒）
+
+# ============================================
+# 智能体（Agent）配置
+# 在原有 CV 管线上叠加 LLM 推理，实现自然播报、对话、时序记忆。
+# 未配置 api_key 或调用失败时自动回退到模板播报，系统仍可完整运行。
+# 支持任意 OpenAI 兼容端点（DeepSeek/通义千问/智谱GLM/OpenAI）。
+# 也可通过环境变量覆盖：BLINDGUARD_AGENT_LLM_API_KEY 等。
+# ============================================
+agent:
+  enabled: true             # 是否启用智能体层
+  llm:
+    base_url: "https://api.deepseek.com/v1"   # OpenAI 兼容端点
+    api_key: ""             # 留空！密钥写入 .env 的 BLINDGUARD_AGENT_LLM_API_KEY（.env 已被 gitignore）
+    model: "deepseek-chat"  # 模型名
+    temperature: 0.6        # 采样温度
+    timeout: 8              # 请求超时（秒）
+  announce:
+    cooldown: 3.0           # 播报冷却（秒），避免每帧都调 LLM
+    memory_size: 8          # 时序记忆滑动窗口帧数
+  chat:
+    max_history: 6          # 对话保留的历史轮数
 
 # 日志配置
 logger:
@@ -84,6 +109,12 @@ server:
 
 # 英文类别 -> 中文类别映射
 class_mapping:
+  # 自定义模型类别（best.pt，下划线命名）
+  manhole_cover: "井盖"
+  public_facility: "公共设施"
+  tactile_paving: "盲道"
+  traffic_light: "红绿灯"
+  # COCO 通用类别
   person: "行人"
   bicycle: "自行车"
   car: "汽车"
