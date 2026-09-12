@@ -108,6 +108,13 @@ class SimpleTracker:
             det['track_id'] = best['id']
             det['track_age'] = round(now - best['first_seen'], 1)
 
+            # 轨迹置信度：该目标历史最高确认度。同一物体连续出现的"确认度"
+            # 应高于任何单帧（单帧分值受遮挡/模糊/距离波动），供前端稳定展示；
+            # 播报与风险评估仍用单帧置信度（安全逻辑基于当前帧证据）
+            conf = float(det.get('confidence', 0))
+            best['best_conf'] = max(best.get('best_conf', 0.0), conf)
+            det['conf_smooth'] = round(best['best_conf'], 3)
+
             # 趋势：与 trend_window 秒前最早的样本比较面积
             ref_area = None
             for t, a in best['history']:

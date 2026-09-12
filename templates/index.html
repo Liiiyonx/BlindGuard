@@ -691,7 +691,9 @@
                 }
                 let html = '';
                 data.detections.forEach(det => {
-                    const conf = (det.confidence * 100).toFixed(1);
+                    // 轨迹置信度优先（目标历史最高确认度，稳定），单帧置信度兜底
+                    const confV = det.conf_smooth != null ? det.conf_smooth : det.confidence;
+                    const conf = (confV * 100).toFixed(1);
                     const risk = det.risk_level || 'safe';
                     const score = det.risk_score != null ? (det.risk_score * 100).toFixed(0) : '-';
                     const name = det.class_name_cn || det.class_name || '未知';
@@ -712,8 +714,8 @@
                             <div><b>${name}</b>${tags}</div>
                             <div class="risk-dot ${risk}"></div>
                         </div>
-                        <div class="conf-bar" title="置信度 ${conf}%"><i style="width:${conf}%"></i></div>
-                        <div class="det-sub">置信度 ${conf}% · 风险分 ${score}${zone ? ' · ' + zone : ''}${dur}</div>
+                        <div class="conf-bar" title="轨迹置信度 ${conf}%（该目标历史最高确认度）"><i style="width:${conf}%"></i></div>
+                        <div class="det-sub">轨迹置信度 ${conf}% · 风险分 ${score}${zone ? ' · ' + zone : ''}${dur}</div>
                     </div>`;
                 });
                     list.innerHTML = html;

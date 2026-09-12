@@ -235,7 +235,7 @@ class RiskEvaluator:
             'area_ratio': area_ratio
         }
         # 透传跟踪器/红绿灯的附加信息
-        for key in ('light_state', 'track_id', 'track_age', 'trend'):
+        for key in ('light_state', 'track_id', 'track_age', 'trend', 'conf_smooth'):
             if key in detection:
                 result[key] = detection[key]
         return result
