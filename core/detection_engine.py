@@ -158,12 +158,12 @@ class DetectionEngine:
                 confidence = float(box.conf[0].cpu().numpy())
                 class_name = self.class_names.get(class_id, f'class_{class_id}')
 
-                # 计算中心点和面积
-                center_x = (x1 + x2) / 2
-                center_y = (y1 + y2) / 2
-                width = x2 - x1
-                height = y2 - y1
-                area = width * height
+                # 计算中心点和面积（统一转为 Python 原生类型，保证可 JSON 序列化）
+                center_x = float((x1 + x2) / 2)
+                center_y = float((y1 + y2) / 2)
+                width = int(x2 - x1)
+                height = int(y2 - y1)
+                area = int(width * height)
 
                 # 边界检查
                 x1 = max(0, min(x1, frame_w))

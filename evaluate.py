@@ -402,6 +402,85 @@ def cmd_bootstrap(args):
     print(f"模型类别表（供 data yaml 使用）：\n{class_names_block}")
 
 
+# ==================== collect：人工抽检样本采集 ====================
+
+def cmd_collect(args):
+    """从视频采集两类人工评测样本：
+    1. 含检测结果的抽样帧（供人工核对检测框真伪 -> Precision/Recall）
+    2. 红绿灯检测裁剪图（供人工标注灯色 -> 真实灯色准确率）
+    """
+    import cv2
+    import json
+    from core.config_manager import ConfigManager
+    from core.detection_engine import DetectionEngine
+
+    model_cfg = ConfigManager('config.yaml').get_section('model')
+    detector = DetectionEngine(
+        model_path=model_cfg.get('path', 'best.pt'),
+        confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
+        iou_threshold=model_cfg.get('iou_threshold', 0.45),
+        img_size=model_cfg.get('img_size', 640),
+    )
+
+    spot_dir = os.path.join('evaluation', 'spotcheck')
+    crop_dir = os.path.join('evaluation', 'light_crops')
+    for d in (spot_dir, crop_dir):
+        os.makedirs(d, exist_ok=True)
+
+    cap = cv2.VideoCapture(args.source)
+    if not cap.isOpened():
+        print(f"[错误] 无法打开视频: {args.source}")
+        sys.exit(1)
+
+    spot_saved, crop_saved, frame_idx = 0, 0, 0
+    fw = fh = 0
+    while spot_saved < args.frames:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        detections = detector.detect(frame)
+        fh, fw = frame.shape[:2]
+
+        # 保存红绿灯裁剪图（外扩 15% 保留上下文）
+        for d in detections:
+            if (d.get('class_name') in ('traffic_light', 'traffic light')
+                    and d.get('confidence', 0) >= 0.4
+                    and crop_saved < args.light_max):
+                x1, y1, x2, y2 = d['bbox']
+                px, py = int((x2 - x1) * 0.15) + 4, int((y2 - y1) * 0.15) + 4
+                crop = frame[max(0, y1 - py):min(fh, y2 + py),
+                             max(0, x1 - px):min(fw, x2 + px)]
+                if crop.size:
+                    cv2.imwrite(os.path.join(crop_dir, f"light_{frame_idx:06d}.jpg"), crop)
+                    crop_saved += 1
+
+        # 保存抽样帧（降采样到宽 560，便于人工目视核对）与对应检测 JSON
+        if detections and spot_saved < args.frames and frame_idx % args.stride == 0:
+            scale = 560 / fw
+            small = cv2.resize(frame, (560, int(fh * scale))) if scale < 1 else frame
+            cv2.imwrite(os.path.join(spot_dir, f"frame_{frame_idx:06d}.jpg"), small)
+            # 带框图：人工核对每个框是否命中真实目标
+            boxed = small.copy()
+            for d in detections:
+                x1, y1, x2, y2 = [int(v * scale) for v in d['bbox']]
+                cv2.rectangle(boxed, (x1, y1), (x2, y2), (0, 255, 255), 2)
+                cv2.putText(boxed, f"{d['class_name']} {d['confidence']:.2f}",
+                            (x1, max(14, y1 - 5)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+            cv2.imwrite(os.path.join(spot_dir, f"frame_{frame_idx:06d}_box.jpg"), boxed)
+            with open(os.path.join(spot_dir, f"frame_{frame_idx:06d}.json"),
+                      'w', encoding='utf-8') as f:
+                json.dump(detections, f, ensure_ascii=False, indent=1)
+            spot_saved += 1
+
+        frame_idx += 1
+
+    cap.release()
+    print(f"[完成] 抽检帧 {spot_saved} 张 -> {spot_dir}（jpg+同名json，坐标已按比例换算需除以缩放比）")
+    print(f"       红绿灯裁剪图 {crop_saved} 张 -> {crop_dir}")
+    print(f"       说明: json 中坐标基于原始帧宽 {fw}，人工核对时请按 560/{fw} 换算")
+
+
 def main():
     parser = argparse.ArgumentParser(description='BlindGuard 答辩指标评测')
     sub = parser.add_subparsers(dest='cmd', required=True)
@@ -425,6 +504,13 @@ def main():
     p.add_argument('--stride', type=int, default=30, help='每 N 帧抽 1 帧')
     p.add_argument('--frames', type=int, default=150, help='最多抽取帧数')
     p.set_defaults(func=cmd_bootstrap)
+
+    p = sub.add_parser('collect', help='采集人工抽检样本（抽检帧 + 红绿灯裁剪图）')
+    p.add_argument('--source', default='uploads/video.mp4')
+    p.add_argument('--stride', type=int, default=60, help='抽检帧的抽样间隔')
+    p.add_argument('--frames', type=int, default=12, help='最多保存抽检帧数')
+    p.add_argument('--light-max', type=int, default=24, help='最多保存红绿灯裁剪图数')
+    p.set_defaults(func=cmd_collect)
 
     args = parser.parse_args()
     args.func(args)

@@ -1,0 +1,21 @@
+[
+ {
+  "bbox": [
+   898,
+   713,
+   1073,
+   826
+  ],
+  "class_name": "manhole_cover",
+  "class_id": 2,
+  "confidence": 0.6127,
+  "center": [
+   985.5,
+   769.5
+  ],
+  "width": 175,
+  "height": 113,
+  "area": 19775,
+  "area_ratio": 0.007838
+ }
+]

@@ -12,7 +12,7 @@ camera:
 # YOLOv10 检测模型配置
 detector:
   model_path: "best.pt"     # 模型文件路径（使用训练好的自定义模型）
-  confidence: 0.5           # 置信度阈值（可调）
+  confidence: 0.6           # 置信度阈值（0.5→0.6：人工抽检发现 0.53-0.73 区间误检集中，宁漏勿误）
   iou_threshold: 0.45       # IoU 阈值（可调）
   device: ""                # 推理设备：""=自动, "cpu", "cuda:0"
   img_size: 640             # 推理图像尺寸

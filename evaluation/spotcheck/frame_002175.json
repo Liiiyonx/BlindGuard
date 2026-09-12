@@ -1,0 +1,40 @@
+[
+ {
+  "bbox": [
+   0,
+   793,
+   1080,
+   2336
+  ],
+  "class_name": "bicycle",
+  "class_id": 1,
+  "confidence": 0.7252,
+  "center": [
+   540.0,
+   1564.5
+  ],
+  "width": 1080,
+  "height": 1543,
+  "area": 1666440,
+  "area_ratio": 0.660531
+ },
+ {
+  "bbox": [
+   148,
+   921,
+   1045,
+   1583
+  ],
+  "class_name": "bicycle",
+  "class_id": 1,
+  "confidence": 0.6086,
+  "center": [
+   596.5,
+   1252.0
+  ],
+  "width": 897,
+  "height": 662,
+  "area": 593814,
+  "area_ratio": 0.235371
+ }
+]

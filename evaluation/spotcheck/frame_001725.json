@@ -1,0 +1,21 @@
+[
+ {
+  "bbox": [
+   217,
+   617,
+   1072,
+   2261
+  ],
+  "class_name": "bicycle",
+  "class_id": 1,
+  "confidence": 0.6273,
+  "center": [
+   644.5,
+   1439.0
+  ],
+  "width": 855,
+  "height": 1644,
+  "area": 1405620,
+  "area_ratio": 0.557149
+ }
+]

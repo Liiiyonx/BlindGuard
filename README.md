@@ -153,10 +153,15 @@ python test_agent_tools.py            # 工具调用循环测试（本地模拟 
 
 python evaluate.py perf               # 推理性能：各阶段耗时/FPS/CPU内存/播报延迟
 python evaluate.py light --synthetic 60    # 红绿灯识别自检；有真实裁剪图用 --dir
+python evaluate.py collect            # 采集人工抽检帧+红绿灯裁剪图
 python evaluate.py bootstrap          # 从视频抽帧+伪标签，人工校正后生成测试集
 python evaluate.py accuracy --data data_eval.yaml   # mAP / 各类别 AP
 # 结果写入 evaluation/metrics_report.md，答辩可直接引用
 ```
+
+> **已完成的评测结论**（详见 `evaluation/metrics_report.md`）：CPU 推理 10.4 FPS、检测占耗时 90%；
+> 人工抽检发现录屏素材与训练数据存在明显域差距（行人误检为 car、前景手套误检为 bicycle），
+> 据此已将置信度阈值上调至 0.6，并列出以第一人称实拍数据重训的改进路线。
 
 ## 配置说明（config.yaml）
 
@@ -223,6 +228,13 @@ agent:               # 智能体
 | 安全 | 🟢 绿色 | 可正常通行 | - |
 
 ## 版本历史
+
+### V2.1.2 (2026)
+- evaluate.py 新增 collect 模式（人工抽检帧 + 红绿灯裁剪图采集）
+- 修复检测输出中的 numpy 类型（无法 JSON 序列化）
+- 首轮人工抽检（12 帧/15 框）发现录屏素材域差距：行人误检为 car、前景手套误检为 bicycle
+- 依据抽检证据将置信度阈值 0.5 → 0.6（宁漏勿误），确立"第一人称实拍数据重训"改进路线
+- 评测报告完整化：性能 / 红绿灯 / 人工抽检三节，含方法学与改进清单
 
 ### V2.1.1 (2026)
 - 播报分级保守策略：低于 medium 等级或置信度阈值的目标不主动播报（宁可漏报不误报）

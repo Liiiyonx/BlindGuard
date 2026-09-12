@@ -1,0 +1,21 @@
+[
+ {
+  "bbox": [
+   409,
+   22,
+   944,
+   1954
+  ],
+  "class_name": "car",
+  "class_id": 0,
+  "confidence": 0.6392,
+  "center": [
+   676.5,
+   988.0
+  ],
+  "width": 535,
+  "height": 1932,
+  "area": 1033620,
+  "area_ratio": 0.409698
+ }
+]
