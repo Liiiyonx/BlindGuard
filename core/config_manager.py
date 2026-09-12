@@ -238,13 +238,19 @@ class ConfigManager:
         # 转换检测器配置
         if 'detector' in config:
             detector = config['detector']
-            config['model'] = {
+            model_cfg = {
                 'path': detector.get('model_path', 'best.pt'),
                 'confidence_threshold': detector.get('confidence', 0.5),
                 'iou_threshold': detector.get('iou_threshold', 0.45),
                 'device': detector.get('device', ''),
                 'img_size': detector.get('img_size', 640)
             }
+            # 透传扩展键（focus_classes/aux_model_path/aux_classes 等）
+            known = ('model_path', 'confidence', 'iou_threshold', 'device', 'img_size')
+            for key, value in detector.items():
+                if key not in known:
+                    model_cfg[key] = value
+            config['model'] = model_cfg
 
         # 转换风险引擎配置
         if 'risk_engine' in config:

@@ -11,11 +11,26 @@ camera:
 
 # YOLOv10 检测模型配置
 detector:
-  model_path: "best.pt"     # 模型文件路径（使用训练好的自定义模型）
-  confidence: 0.6           # 置信度阈值（0.5→0.6：人工抽检发现 0.53-0.73 区间误检集中，宁漏勿误）
+  # 主模型：通用交通类（person/car/bicycle/traffic light）
+  # 训练后可指向 runs/detect/blindguard_v2/weights/best.pt（领域微调版）
+  model_path: "yolov10n.pt"
+  confidence: 0.6           # 置信度阈值（抽检证据：0.53-0.73 区间误检集中，宁漏勿误）
   iou_threshold: 0.45       # IoU 阈值（可调）
-  device: ""                # 推理设备：""=自动, "cpu", "cuda:0"
+  device: ""                # 推理设备：""=自动(有GPU用GPU), "cpu", "cuda:0"
   img_size: 640             # 推理图像尺寸
+  # 主模型只检测这些类别（COCO 80 类中与导盲相关的子集，降低无关误检）
+  focus_classes:
+    - "person"
+    - "car"
+    - "bicycle"
+    - "traffic light"
+  # 辅助模型：定制类专家（井盖/盲道/公共设施）。留空 "" 关闭双模型
+  aux_model_path: "best.pt"
+  # 辅助模型类别白名单——旧模型的 person→car / 手套→bicycle 误检被此白名单直接拦截
+  aux_classes:
+    - "manhole_cover"
+    - "public_facility"
+    - "tactile_paving"
 
 # 危险判断引擎配置（阈值可调）
 risk_engine:

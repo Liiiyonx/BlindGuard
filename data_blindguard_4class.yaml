@@ -1,0 +1,9 @@
+path: C:\Users\Liii\Desktop\BlindGuard\dataset\blindguard_4class
+train: images/train
+val: images/val
+
+names:
+  0: car
+  1: bicycle
+  2: traffic_light
+  3: person

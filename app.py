@@ -117,7 +117,7 @@ class BlindGuardApp:
             height=cam_cfg.get('height', 480),
         )
 
-        # 检测引擎
+        # 检测引擎（主模型：通用交通类）
         model_cfg = self.config.get_section('model')
         self.detector = DetectionEngine(
             model_path=model_cfg.get('path', 'best.pt'),
@@ -126,7 +126,34 @@ class BlindGuardApp:
             device=model_cfg.get('device', ''),
             img_size=model_cfg.get('img_size', 640),
         )
-        logger.info(f"模型加载: {self.detector.get_class_names()}")
+        logger.info(f"主模型加载: {self.detector.get_class_names()}")
+
+        # 主模型类别过滤（COCO 80 类 -> 导盲相关子集）
+        focus_names = model_cfg.get('focus_classes') or []
+        name2id = {v: k for k, v in self.detector.get_class_names().items()}
+        self._focus_class_ids = [name2id[n] for n in focus_names if n in name2id] or None
+
+        # 辅助检测引擎（定制类专家：井盖/盲道/公共设施），未配置则单模型
+        self.aux_detector = None
+        self._aux_class_ids = None
+        aux_path = model_cfg.get('aux_model_path') or ''
+        if aux_path:
+            try:
+                self.aux_detector = DetectionEngine(
+                    model_path=aux_path,
+                    confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
+                    iou_threshold=model_cfg.get('iou_threshold', 0.45),
+                    device=model_cfg.get('device', ''),
+                    img_size=model_cfg.get('img_size', 640),
+                )
+                aux_names = model_cfg.get('aux_classes') or []
+                aux_name2id = {v: k for k, v in self.aux_detector.get_class_names().items()}
+                self._aux_class_ids = [aux_name2id[n] for n in aux_names
+                                       if n in aux_name2id] or None
+                logger.info(f"辅助模型加载: {aux_path} (定制类白名单: {aux_names})")
+            except Exception as e:
+                logger.warning(f"辅助模型加载失败，退回单模型: {e}")
+                self.aux_detector = None
 
         # 类别中英文映射（唯一来源：config.yaml class_mapping，默认表兜底）
         self.class_mapping = self.config.get('class_mapping', {}) or {}
@@ -303,8 +330,11 @@ class BlindGuardApp:
             frame_h, frame_w = frame.shape[:2]
             self._frame_size = (frame_w, frame_h)
 
-            # --- 管线：检测 → 红绿灯状态 → 跟踪 → 风险 → 场景 ---
-            detections = self.detector.detect(frame)
+            # --- 管线：检测(主+辅) → 红绿灯状态 → 跟踪 → 风险 → 场景 ---
+            detections = self.detector.detect(frame, classes=self._focus_class_ids)
+            if self.aux_detector is not None:
+                aux_dets = self.aux_detector.detect(frame, classes=self._aux_class_ids)
+                detections = self._merge_detections(detections, aux_dets)
             for det in detections:
                 if det.get('class_name') in TRAFFIC_LIGHT_CLASSES:
                     det['light_state'] = self.light_classifier.classify(
@@ -387,6 +417,32 @@ class BlindGuardApp:
 
     def _video_feed(self):
         return Response(self._stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+    @staticmethod
+    def _box_iou(a, b):
+        ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
+        ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
+        inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+        if inter <= 0:
+            return 0.0
+        area_a = max(0, a[2] - a[0]) * max(0, a[3] - a[1])
+        area_b = max(0, b[2] - b[0]) * max(0, b[3] - b[1])
+        union = area_a + area_b - inter
+        return inter / union if union > 0 else 0.0
+
+    def _merge_detections(self, main_dets, aux_dets):
+        """双模型合并：主模型优先，辅助模型仅补充与其不重叠的同类别框
+        （辅助模型经类别白名单过滤，旧模型的 person→car 误检在此被拦截）"""
+        merged = list(main_dets)
+        for a in aux_dets:
+            duplicate = any(
+                m['class_name'] == a['class_name']
+                and self._box_iou(m['bbox'], a['bbox']) > 0.55
+                for m in main_dets
+            )
+            if not duplicate:
+                merged.append(a)
+        return merged
 
     def _enrich_detections(self, risk_results):
         """为风险评估结果补充中文名等前端所需字段"""
