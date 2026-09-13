@@ -11,8 +11,8 @@ camera:
 
 # YOLOv10 检测模型配置
 detector:
-  # 主模型：通用交通类（v5 = v4 + BDD100K 1万张路域数据微调，部署域 mAP50 39.9→51.6）
-  model_path: "best_v5.pt"
+  # 主模型：通用交通类（s 系 = yolov10s 容量升级 + BDD 路域数据，BDD 路域 mAP50 55.7）
+  model_path: "best_s.pt"
   confidence: 0.5           # 置信度阈值（v3 阈值扫描：0.5 时精确率 91.5%/召回 41.0%，
                             # 0.6 为 94%/35.6%——导盲场景漏检比误报更危险，取 0.5 平衡点）
   iou_threshold: 0.45       # IoU 阈值（可调）
