@@ -1,0 +1,974 @@
+{
+  "url": "http://127.0.0.1:5000",
+  "video": "C:\\Users\\Liii\\Desktop\\BlindGuard\\uploads\\video.mp4",
+  "checks": [
+    {
+      "name": "首页加载",
+      "passed": true,
+      "detail": {
+        "http_status": 200
+      }
+    },
+    {
+      "name": "初始按钮状态",
+      "passed": true,
+      "detail": {
+        "#btnStartSystem": {
+          "visible": true,
+          "enabled": true,
+          "text": "启动系统"
+        },
+        "#btnStopSystem": {
+          "visible": true,
+          "enabled": false,
+          "text": "停止系统"
+        },
+        "#btnStartCamera": {
+          "visible": true,
+          "enabled": false,
+          "text": "开启摄像头"
+        },
+        "#btnStopCamera": {
+          "visible": true,
+          "enabled": false,
+          "text": "关闭摄像头"
+        },
+        "#btnStopVideo": {
+          "visible": true,
+          "enabled": false,
+          "text": "停止视频"
+        }
+      }
+    },
+    {
+      "name": "大字模式按钮",
+      "passed": true,
+      "detail": {
+        "on": true,
+        "persisted": true,
+        "bodyFont": 18,
+        "messageFont": 18,
+        "buttonFont": 18,
+        "titleFont": 26,
+        "bodyColor": "rgb(255, 255, 255)",
+        "bodyBackground": "rgb(0, 0, 0)",
+        "pressed": "true",
+        "label": "关闭大字模式"
+      }
+    },
+    {
+      "name": "标签层按钮",
+      "passed": true,
+      "detail": {
+        "off": true,
+        "persisted": true,
+        "label": "标签层: 关"
+      }
+    },
+    {
+      "name": "启动系统按钮",
+      "passed": true,
+      "detail": {
+        "backend": {
+          "camera_active": false,
+          "detection_count": 0,
+          "events": [
+            {
+              "level": "safe",
+              "text": "系统已停止",
+              "time": "07:14:49"
+            }
+          ],
+          "fps": 0,
+          "frame_h": 480,
+          "frame_w": 640,
+          "last_message": "系统已停止",
+          "overall_risk": "safe",
+          "running": true,
+          "scene_type": "",
+          "scene_type_cn": "",
+          "video_active": false,
+          "video_paused": false,
+          "video_position": 0,
+          "video_speed": 1.0,
+          "video_total": 0
+        },
+        "button": {
+          "visible": true,
+          "enabled": false,
+          "text": "启动系统"
+        },
+        "stop_button": {
+          "visible": true,
+          "enabled": true,
+          "text": "停止系统"
+        }
+      }
+    },
+    {
+      "name": "刷新后的运行状态恢复",
+      "passed": true,
+      "detail": {
+        "status": {
+          "camera_active": false,
+          "detection_count": 0,
+          "events": [
+            {
+              "level": "safe",
+              "text": "系统已停止",
+              "time": "07:14:49"
+            }
+          ],
+          "fps": 0,
+          "frame_h": 480,
+          "frame_w": 640,
+          "last_message": "系统已停止",
+          "overall_risk": "safe",
+          "running": true,
+          "scene_type": "",
+          "scene_type_cn": "",
+          "video_active": false,
+          "video_paused": false,
+          "video_position": 0,
+          "video_speed": 1.0,
+          "video_total": 0
+        },
+        "start_button": {
+          "visible": true,
+          "enabled": false,
+          "text": "启动系统"
+        },
+        "stop_button": {
+          "visible": true,
+          "enabled": true,
+          "text": "停止系统"
+        }
+      }
+    },
+    {
+      "name": "开启摄像头按钮",
+      "passed": true,
+      "detail": {
+        "started": true,
+        "message": "摄像头已开启",
+        "button": {
+          "visible": true,
+          "enabled": false,
+          "text": "开启摄像头"
+        }
+      }
+    },
+    {
+      "name": "关闭摄像头按钮",
+      "passed": true,
+      "detail": {
+        "backend": {
+          "camera_active": false,
+          "detection_count": 0,
+          "events": [
+            {
+              "level": "safe",
+              "text": "摄像头已关闭",
+              "time": "07:14:58"
+            },
+            {
+              "level": "safe",
+              "text": "系统已停止",
+              "time": "07:14:49"
+            }
+          ],
+          "fps": 0,
+          "frame_h": 480,
+          "frame_w": 640,
+          "last_message": "摄像头已关闭",
+          "overall_risk": "safe",
+          "running": true,
+          "scene_type": "",
+          "scene_type_cn": "",
+          "video_active": false,
+          "video_paused": false,
+          "video_position": 0,
+          "video_speed": 1.0,
+          "video_total": 0
+        },
+        "button": {
+          "visible": true,
+          "enabled": false,
+          "text": "关闭摄像头"
+        }
+      }
+    },
+    {
+      "name": "上传视频区域-键盘 Enter",
+      "passed": true,
+      "detail": {
+        "backend": {
+          "camera_active": false,
+          "detection_count": 0,
+          "events": [
+            {
+              "level": "safe",
+              "text": "摄像头已关闭",
+              "time": "07:14:58"
+            },
+            {
+              "level": "safe",
+              "text": "系统已停止",
+              "time": "07:14:49"
+            }
+          ],
+          "fps": 0,
+          "frame_h": 480,
+          "frame_w": 640,
+          "last_message": "摄像头已关闭",
+          "overall_risk": "safe",
+          "running": true,
+          "scene_type": "",
+          "scene_type_cn": "",
+          "video_active": true,
+          "video_paused": false,
+          "video_position": 1,
+          "video_speed": 1.0,
+          "video_total": 2896
+        },
+        "controls_visible": true,
+        "key": "Enter"
+      }
+    },
+    {
+      "name": "暂停/播放按钮-暂停",
+      "passed": true,
+      "detail": {
+        "backend": {
+          "camera_active": false,
+          "detection_count": 0,
+          "events": [
+            {
+              "level": "safe",
+              "text": "摄像头已关闭",
+              "time": "07:14:58"
+            },
+            {
+              "level": "safe",
+              "text": "系统已停止",
+              "time": "07:14:49"
+            }
+          ],
+          "fps": 0,
+          "frame_h": 480,
+          "frame_w": 640,
+          "last_message": "摄像头已关闭",
+          "overall_risk": "safe",
+          "running": true,
+          "scene_type": "",
+          "scene_type_cn": "",
+          "video_active": true,
+          "video_paused": true,
+          "video_position": 1,
+          "video_speed": 1.0,
+          "video_total": 2896
+        },
+        "button": "播放"
+      }
+    },
+    {
+      "name": "暂停/播放按钮-继续",
+      "passed": true,
+      "detail": {
+        "backend": {
+          "camera_active": false,
+          "detection_count": 0,
+          "events": [
+            {
+              "level": "safe",
+              "text": "摄像头已关闭",
+              "time": "07:14:58"
+            },
+            {
+              "level": "safe",
+              "text": "系统已停止",
+              "time": "07:14:49"
+            }
+          ],
+          "fps": 0,
+          "frame_h": 480,
+          "frame_w": 640,
+          "last_message": "摄像头已关闭",
+          "overall_risk": "safe",
+          "running": true,
+          "scene_type": "",
+          "scene_type_cn": "",
+          "video_active": true,
+          "video_paused": false,
+          "video_position": 1,
+          "video_speed": 1.0,
+          "video_total": 2896
+        },
+        "button": "暂停"
+      }
+    },
+    {
+      "name": "倍速按钮组",
+      "passed": true,
+      "detail": {
+        "0.5": {
+          "backend": 0.5,
+          "active": "0.5x"
+        },
+        "1.0": {
+          "backend": 1.0,
+          "active": "1x"
+        },
+        "1.5": {
+          "backend": 1.5,
+          "active": "1.5x"
+        },
+        "2.0": {
+          "backend": 2.0,
+          "active": "2x"
+        }
+      }
+    },
+    {
+      "name": "进度条回跳",
+      "passed": true,
+      "detail": {
+        "before": 3,
+        "after": 2022,
+        "total": 2896,
+        "target": 2027,
+        "tolerance": 28,
+        "error": 5
+      }
+    },
+    {
+      "name": "进度条键盘回跳",
+      "passed": true,
+      "detail": {
+        "tolerance": 28,
+        "results": [
+          {
+            "key": "Home",
+            "before": 2022,
+            "target": 0,
+            "after": 0,
+            "api_success": true,
+            "error": 0
+          },
+          {
+            "key": "End",
+            "before": 0,
+            "target": 2895,
+            "after": 2895,
+            "api_success": true,
+            "error": 0
+          },
+          {
+            "key": "PageUp",
+            "before": 2895,
+            "target": 2605,
+            "after": 2605,
+            "api_success": true,
+            "error": 0
+          },
+          {
+            "key": "PageDown",
+            "before": 2605,
+            "target": 2895,
+            "after": 2895,
+            "api_success": true,
+            "error": 0
+          },
+          {
+            "key": "ArrowLeft",
+            "before": 2895,
+            "target": 2866,
+            "after": 2866,
+            "api_success": true,
+            "error": 0
+          },
+          {
+            "key": "ArrowRight",
+            "before": 2866,
+            "target": 2895,
+            "after": 2895,
+            "api_success": true,
+            "error": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "时间线回跳",
+      "passed": null,
+      "detail": "本次短测没有产生可回跳的主动播报事件"
+    },
+    {
+      "name": "停止视频按钮",
+      "passed": true,
+      "detail": {
+        "backend": {
+          "camera_active": false,
+          "detection_count": 0,
+          "events": [
+            {
+              "level": "safe",
+              "text": "视频播放已停止",
+              "time": "07:15:13"
+            },
+            {
+              "level": "safe",
+              "text": "摄像头已关闭",
+              "time": "07:14:58"
+            },
+            {
+              "level": "safe",
+              "text": "系统已停止",
+              "time": "07:14:49"
+            }
+          ],
+          "fps": 0,
+          "frame_h": 2336,
+          "frame_w": 1080,
+          "last_message": "视频播放已停止",
+          "overall_risk": "safe",
+          "running": true,
+          "scene_type": "",
+          "scene_type_cn": "",
+          "video_active": false,
+          "video_paused": false,
+          "video_position": 0,
+          "video_speed": 2.0,
+          "video_total": 0
+        },
+        "controls_visible": false,
+        "stale_detection_count": 0
+      }
+    },
+    {
+      "name": "重新上传后倍速归位",
+      "passed": true,
+      "detail": {
+        "backend": {
+          "camera_active": false,
+          "detection_count": 0,
+          "events": [
+            {
+              "level": "safe",
+              "text": "视频播放已停止",
+              "time": "07:15:13"
+            },
+            {
+              "level": "safe",
+              "text": "摄像头已关闭",
+              "time": "07:14:58"
+            },
+            {
+              "level": "safe",
+              "text": "系统已停止",
+              "time": "07:14:49"
+            }
+          ],
+          "fps": 0,
+          "frame_h": 2336,
+          "frame_w": 1080,
+          "last_message": "视频播放已停止",
+          "overall_risk": "safe",
+          "running": true,
+          "scene_type": "",
+          "scene_type_cn": "",
+          "video_active": true,
+          "video_paused": false,
+          "video_position": 1,
+          "video_speed": 1.0,
+          "video_total": 2896
+        },
+        "active": "1x"
+      }
+    },
+    {
+      "name": "快捷提问按钮组",
+      "passed": true,
+      "detail": [
+        {
+          "question": "前面有什么",
+          "last_reply": "导盲助手\n当前没有看到周围目标，请把摄像头对准环境后再问。"
+        },
+        {
+          "question": "现在能过马路吗",
+          "last_reply": "导盲助手\n当前没有可靠的路况和信号灯信息，不能判断能否通行。请先人工确认。系统仅为辅助提示，不能确认可通行。"
+        },
+        {
+          "question": "周围有什么危险",
+          "last_reply": "导盲助手\n当前没有看到周围目标，请把摄像头对准环境后再问。"
+        },
+        {
+          "question": "读一下路牌上的字",
+          "last_reply": "导盲助手\n当前没有看到周围目标，请把摄像头对准环境后再问。"
+        }
+      ]
+    },
+    {
+      "name": "智能体状态徽标",
+      "passed": true,
+      "detail": {
+        "backend": {
+          "agent_version": "2.5.0",
+          "announcement_count": 1,
+          "architecture": "orchestrated-specialists-with-safety-guard",
+          "chat_turns": 4,
+          "enabled": true,
+          "event_count": 0,
+          "fallback_active": true,
+          "last_error": "HTTP 402: {\"error\":{\"message\":\"Insufficient Balance\",\"type\":\"unknown_error\",\"param\":null,\"code\":\"invalid_request_error\"}}",
+          "last_plan": {
+            "confidence": 0.9,
+            "intent": "vision",
+            "lead_role": "visual_observer",
+            "prefetch_tools": [
+              "get_current_detections"
+            ],
+            "reason": "检测到画面细节意图，建议调用视觉观察员",
+            "requires_llm": true,
+            "suggested_tools": [
+              "look_at_frame",
+              "get_current_detections"
+            ],
+            "supporting_roles": [
+              "perception",
+              "risk_analyst",
+              "safety_guard"
+            ]
+          },
+          "last_run": {
+            "duration_ms": 3,
+            "final_safe": true,
+            "intent": "vision",
+            "lead_role": "visual_observer",
+            "path": "llm_context",
+            "prefetch_tools": [
+              "get_current_detections"
+            ],
+            "raw_reply": "当前没有看到周围目标，请把摄像头对准环境后再问。",
+            "role_contributions": [
+              {
+                "authority": "观察结果仅作辅助信息",
+                "name": "视觉观察员",
+                "role": "visual_observer",
+                "source": "none",
+                "status": "ready",
+                "success": false,
+                "summary": "角色已就绪，但本轮没有可执行的本地只读工具",
+                "tool": null
+              },
+              {
+                "authority": "只描述观测，不推断未检测到的安全",
+                "name": "实时感知员",
+                "role": "perception",
+                "source": "prefetched",
+                "status": "completed",
+                "success": true,
+                "summary": "当前未检测到目标；未检出不能解释为安全",
+                "tool": "get_current_detections"
+              },
+              {
+                "authority": "只提供风险建议，不作通行授权",
+                "name": "风险分析员",
+                "role": "risk_analyst",
+                "source": "specialist",
+                "status": "completed",
+                "success": true,
+                "summary": "整体风险 safe；暂无优先避让目标",
+                "tool": "get_risk_assessment"
+              },
+              {
+                "authority": "最终内容仍须经过安全守门员复核",
+                "name": "沟通生成器",
+                "role": "communicator",
+                "source": "orchestrator",
+                "status": "completed",
+                "success": true,
+                "summary": "已生成候选回复并交给安全守门员复核",
+                "tool": null
+              },
+              {
+                "authority": "最高优先级；可覆盖 LLM 输出，但不得授权通行",
+                "name": "安全守门员",
+                "role": "safety_guard",
+                "source": "deterministic_review",
+                "status": "completed",
+                "success": true,
+                "summary": "最终回复通过确定性安全复核",
+                "tool": null
+              }
+            ],
+            "safety_review": {
+              "final_reply_dangerous": false,
+              "guard_passed": true,
+              "guard_triggered": false,
+              "idempotent": true,
+              "passage_intent": false,
+              "raw_reply_dangerous": false,
+              "safety_rewritten": false
+            },
+            "sanitized_reply": "当前没有看到周围目标，请把摄像头对准环境后再问。",
+            "stages": [
+              {
+                "intent": "vision",
+                "lead_role": "visual_observer",
+                "stage": "routing",
+                "status": "completed"
+              },
+              {
+                "stage": "prefetch",
+                "status": "completed",
+                "tool_count": 1
+              },
+              {
+                "role_count": 5,
+                "stage": "specialists",
+                "status": "completed",
+                "tool_count": 1
+              },
+              {
+                "path": "llm_context",
+                "stage": "llm",
+                "status": "completed"
+              },
+              {
+                "denied_count": 0,
+                "stage": "tool_loop",
+                "status": "not_required",
+                "tool_count": 0
+              },
+              {
+                "passed": true,
+                "rewritten": false,
+                "stage": "safety_review",
+                "status": "completed"
+              }
+            ],
+            "supporting_roles": [
+              "perception",
+              "risk_analyst",
+              "safety_guard"
+            ],
+            "time": 1790032527.895,
+            "tool_calls": [
+              {
+                "arguments": "{}",
+                "cache_hit": false,
+                "duration_ms": 1,
+                "error": "",
+                "name": "get_current_detections",
+                "phase": "prefetch",
+                "policy_denied": false,
+                "round": 0,
+                "safety_level": "standard",
+                "success": true
+              },
+              {
+                "arguments": "{}",
+                "cache_hit": false,
+                "duration_ms": 1,
+                "error": "",
+                "name": "get_risk_assessment",
+                "phase": "specialist",
+                "policy_denied": false,
+                "round": 0,
+                "safety_level": "safety_context",
+                "success": true
+              }
+            ]
+          },
+          "llm_active": false,
+          "llm_configured": true,
+          "max_model_tool_calls": 6,
+          "max_specialist_roles": 3,
+          "memory_frames": 0,
+          "model": "本地回退",
+          "orchestrator_version": "1.1",
+          "recent_tool_calls": [
+            {
+              "arguments": "{}",
+              "cache_hit": false,
+              "duration_ms": 1,
+              "error": "",
+              "name": "get_risk_assessment",
+              "phase": "prefetch",
+              "policy_denied": false,
+              "round": 0,
+              "success": true,
+              "time": 1790032527.808,
+              "timed_out": false
+            },
+            {
+              "arguments": "{}",
+              "cache_hit": false,
+              "duration_ms": 1,
+              "error": "",
+              "name": "get_current_detections",
+              "phase": "prefetch",
+              "policy_denied": false,
+              "round": 0,
+              "success": true,
+              "time": 1790032527.809,
+              "timed_out": false
+            },
+            {
+              "arguments": "{}",
+              "cache_hit": false,
+              "duration_ms": 1,
+              "error": "",
+              "name": "get_navigation_guidance",
+              "phase": "specialist",
+              "policy_denied": false,
+              "round": 0,
+              "success": true,
+              "time": 1790032527.81,
+              "timed_out": false
+            },
+            {
+              "arguments": "{}",
+              "cache_hit": false,
+              "duration_ms": 1,
+              "error": "",
+              "name": "get_current_detections",
+              "phase": "prefetch",
+              "policy_denied": false,
+              "round": 0,
+              "success": true,
+              "time": 1790032527.893,
+              "timed_out": false
+            },
+            {
+              "arguments": "{}",
+              "cache_hit": false,
+              "duration_ms": 1,
+              "error": "",
+              "name": "get_risk_assessment",
+              "phase": "specialist",
+              "policy_denied": false,
+              "round": 0,
+              "success": true,
+              "time": 1790032527.895,
+              "timed_out": false
+            }
+          ],
+          "role_catalog": [
+            {
+              "authority": "最高优先级；可覆盖 LLM 输出，但不得授权通行",
+              "description": "红灯、高风险、未知灯色和通行意图的确定性拦截与复核",
+              "key": "safety_guard",
+              "name": "安全守门员",
+              "preferred_tools": [
+                "get_risk_assessment",
+                "get_navigation_guidance",
+                "get_alert_policy"
+              ]
+            },
+            {
+              "authority": "只描述观测，不推断未检测到的安全",
+              "description": "读取当前目标、方位、置信度、跟踪趋势和红绿灯状态",
+              "key": "perception",
+              "name": "实时感知员",
+              "preferred_tools": [
+                "get_current_detections",
+                "get_scene_overview"
+              ]
+            },
+            {
+              "authority": "只提供风险建议，不作通行授权",
+              "description": "输出风险排序、风险原因和优先避让对象",
+              "key": "risk_analyst",
+              "name": "风险分析员",
+              "preferred_tools": [
+                "get_risk_assessment",
+                "get_environment_trends"
+              ]
+            },
+            {
+              "authority": "只提供避障建议，不提供过街或通行授权",
+              "description": "把障碍方位和风险转换成停步、减速、盲杖确认等非通行建议",
+              "key": "navigation_advisor",
+              "name": "无障碍导航员",
+              "preferred_tools": [
+                "get_navigation_guidance",
+                "get_current_detections"
+              ]
+            },
+            {
+              "authority": "记忆不完整时必须明确说明",
+              "description": "聚合目标出现、消失、接近、远离和灯色变化事件",
+              "key": "temporal_memory",
+              "name": "时序记忆员",
+              "preferred_tools": [
+                "get_memory_summary",
+                "get_environment_trends",
+                "get_announcement_history"
+              ]
+            },
+            {
+              "authority": "观察结果仅作辅助信息",
+              "description": "按需调用 VLM 查看文字、标志和检测框外的画面细节",
+              "key": "visual_observer",
+              "name": "视觉观察员",
+              "preferred_tools": [
+                "look_at_frame",
+                "get_scene_overview"
+              ]
+            },
+            {
+              "authority": "仅允许白名单键和范围校验后的写入",
+              "description": "读取和调整语速、播报详略等白名单用户偏好",
+              "key": "preference",
+              "name": "偏好管家",
+              "preferred_tools": [
+                "get_user_preferences",
+                "set_user_preference"
+              ]
+            },
+            {
+              "authority": "最终内容仍须经过安全守门员复核",
+              "description": "将工具结果压缩成简短、自然的中文语音或对话回复",
+              "key": "communicator",
+              "name": "沟通生成器",
+              "preferred_tools": []
+            },
+            {
+              "authority": "保持保守沉默；静默不得解释为环境安全",
+              "description": "根据风险等级、置信度、紧急度、冷却时间和历史记录决定是否主动播报",
+              "key": "alert_manager",
+              "name": "播报策略员",
+              "preferred_tools": [
+                "get_alert_policy",
+                "get_announcement_history"
+              ]
+            },
+            {
+              "authority": "只报告状态，不把系统健康解释为道路安全",
+              "description": "报告模型、工具、视觉、降级和最近工具轨迹",
+              "key": "self_monitor",
+              "name": "运行监控员",
+              "preferred_tools": [
+                "get_system_health",
+                "get_agent_capabilities"
+              ]
+            }
+          ],
+          "role_count": 10,
+          "roles": [
+            "safety_guard",
+            "perception",
+            "risk_analyst",
+            "navigation_advisor",
+            "temporal_memory",
+            "visual_observer",
+            "preference",
+            "communicator",
+            "alert_manager",
+            "self_monitor"
+          ],
+          "specialist_execution_enabled": true,
+          "tool_count": 13,
+          "tool_names": [
+            "get_current_detections",
+            "get_scene_overview",
+            "get_memory_summary",
+            "look_at_frame",
+            "get_user_preferences",
+            "set_user_preference",
+            "get_risk_assessment",
+            "get_navigation_guidance",
+            "get_environment_trends",
+            "get_system_health",
+            "get_agent_capabilities",
+            "get_announcement_history",
+            "get_alert_policy"
+          ],
+          "tool_prefetch_enabled": true,
+          "tools_supported": true,
+          "vision_active": false,
+          "vision_model": ""
+        },
+        "expected": "本地回退",
+        "actual": "本地回退"
+      }
+    },
+    {
+      "name": "发送按钮",
+      "passed": true,
+      "detail": "导盲助手\n当前没有看到周围目标，请把摄像头对准环境后再问。"
+    },
+    {
+      "name": "连续发送顺序",
+      "passed": true,
+      "detail": [
+        "我前面有什么",
+        "我现在能过马路吗"
+      ]
+    },
+    {
+      "name": "语音输入按钮",
+      "passed": true,
+      "detail": {
+        "listening": true,
+        "stopped": true
+      }
+    },
+    {
+      "name": "停止系统按钮",
+      "passed": true,
+      "detail": {
+        "backend": {
+          "camera_active": false,
+          "detection_count": 0,
+          "events": [
+            {
+              "level": "safe",
+              "text": "系统已停止",
+              "time": "07:15:28"
+            }
+          ],
+          "fps": 0,
+          "frame_h": 2336,
+          "frame_w": 1080,
+          "last_message": "系统已停止",
+          "overall_risk": "safe",
+          "running": false,
+          "scene_type": "",
+          "scene_type_cn": "",
+          "video_active": false,
+          "video_paused": false,
+          "video_position": 0,
+          "video_speed": 1.0,
+          "video_total": 0
+        },
+        "frontend": {
+          "fps": "0",
+          "objects": "0",
+          "risk": "安全",
+          "scene": "-",
+          "detections": "暂无检测结果",
+          "timeline": "07:15:28 · 系统已停止",
+          "video_feed_visibility": "hidden",
+          "overlay_ink": 0
+        },
+        "start_button": {
+          "visible": true,
+          "enabled": true,
+          "text": "启动系统"
+        },
+        "stop_button": {
+          "visible": true,
+          "enabled": false,
+          "text": "停止系统"
+        }
+      }
+    }
+  ],
+  "console_errors": [],
+  "page_errors": [],
+  "failed_requests": [],
+  "screenshot": "C:\\Users\\Liii\\Desktop\\BlindGuard\\evaluation\\ui_button_audit.png"
+}

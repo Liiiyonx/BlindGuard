@@ -1,0 +1,1137 @@
+{
+  "url": "http://127.0.0.1:5000",
+  "viewports": [
+    {
+      "name": "mobile_375",
+      "checks": [
+        {
+          "name": "mobile_375_load",
+          "passed": true,
+          "detail": {
+            "http_status": 200,
+            "console_errors": [],
+            "page_errors": [],
+            "failed_requests": []
+          }
+        },
+        {
+          "name": "mobile_375_horizontal_overflow",
+          "passed": true,
+          "detail": {
+            "viewport": [
+              375,
+              812
+            ],
+            "document": [
+              375,
+              1717
+            ]
+          }
+        },
+        {
+          "name": "mobile_375_text_clipping",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "mobile_375_interactive_overlap",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "mobile_375_accessible_names",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "mobile_375_touch_targets",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "mobile_375_keyboard_focus",
+          "passed": true,
+          "detail": {
+            "focused": {
+              "element": "#btnContrast",
+              "outline": "solid 3px",
+              "boxShadow": "none"
+            }
+          }
+        },
+        {
+          "name": "mobile_375_semantics",
+          "passed": true,
+          "detail": {
+            "main_landmark": true,
+            "live_regions": 1,
+            "log_regions": 1,
+            "unlabeled_images": []
+          }
+        }
+      ],
+      "screenshot": "C:\\Users\\Liii\\Desktop\\BlindGuard\\evaluation\\accessibility\\mobile_375.png",
+      "layout": {
+        "viewport": [
+          375,
+          812
+        ],
+        "document": [
+          375,
+          1717
+        ],
+        "horizontal_overflow": false,
+        "targets": [
+          {
+            "element": "button#btnContrast.tool-btn",
+            "role": "button",
+            "box": {
+              "x": 266.1,
+              "y": 11.4,
+              "width": 94.9,
+              "height": 44,
+              "right": 361,
+              "bottom": 55.4
+            },
+            "text": "👁 大字模式",
+            "ariaLabel": "开启大字模式",
+            "title": "开启大字模式"
+          },
+          {
+            "element": "button#btnOverlay.tool-btn",
+            "role": "button",
+            "box": {
+              "x": 264.4,
+              "y": 90.8,
+              "width": 85.6,
+              "height": 44,
+              "right": 350,
+              "bottom": 134.8
+            },
+            "text": "标签层: 开",
+            "ariaLabel": "切换中文标签覆盖层",
+            "title": ""
+          },
+          {
+            "element": "button#btnStartSystem.btn.btn-success",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 486.4,
+              "width": 155.5,
+              "height": 44,
+              "right": 182.5,
+              "bottom": 530.4
+            },
+            "text": "启动系统",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button#btnStopSystem.btn.btn-danger",
+            "role": "button",
+            "box": {
+              "x": 192.5,
+              "y": 486.4,
+              "width": 155.5,
+              "height": 44,
+              "right": 348,
+              "bottom": 530.4
+            },
+            "text": "停止系统",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button#btnStartCamera.btn.btn-primary",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 540.4,
+              "width": 155.5,
+              "height": 44,
+              "right": 182.5,
+              "bottom": 584.4
+            },
+            "text": "开启摄像头",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button#btnStopCamera.btn.btn-secondary",
+            "role": "button",
+            "box": {
+              "x": 192.5,
+              "y": 540.4,
+              "width": 155.5,
+              "height": 44,
+              "right": 348,
+              "bottom": 584.4
+            },
+            "text": "关闭摄像头",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "div.upload-area",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 594.4,
+              "width": 321,
+              "height": 96,
+              "right": 348,
+              "bottom": 690.4
+            },
+            "text": "点击上传视频文件\n\n支持 mp4, avi, mov 等格式",
+            "ariaLabel": "上传视频文件",
+            "title": ""
+          },
+          {
+            "element": "button#btnStopVideo.btn.btn-secondary",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 700.4,
+              "width": 321,
+              "height": 44,
+              "right": 348,
+              "bottom": 744.4
+            },
+            "text": "停止视频",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 1542.3,
+              "width": 93,
+              "height": 44,
+              "right": 120,
+              "bottom": 1586.3
+            },
+            "text": "前面有什么",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 127,
+              "y": 1542.3,
+              "width": 119,
+              "height": 44,
+              "right": 246,
+              "bottom": 1586.3
+            },
+            "text": "现在能过马路吗",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 1593.3,
+              "width": 119,
+              "height": 44,
+              "right": 146,
+              "bottom": 1637.3
+            },
+            "text": "周围有什么危险",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 153,
+              "y": 1593.3,
+              "width": 132,
+              "height": 44,
+              "right": 285,
+              "bottom": 1637.3
+            },
+            "text": "读一下路牌上的字",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "input#chatInput",
+            "role": "input",
+            "box": {
+              "x": 27,
+              "y": 1646.3,
+              "width": 203,
+              "height": 44,
+              "right": 230,
+              "bottom": 1690.3
+            },
+            "text": "",
+            "ariaLabel": "输入问题",
+            "title": ""
+          },
+          {
+            "element": "button#btnMic.btn.btn-secondary",
+            "role": "button",
+            "box": {
+              "x": 238,
+              "y": 1646.3,
+              "width": 44,
+              "height": 44,
+              "right": 282,
+              "bottom": 1690.3
+            },
+            "text": "🎤",
+            "ariaLabel": "语音输入",
+            "title": "语音输入"
+          },
+          {
+            "element": "button#btnSend.btn.btn-primary",
+            "role": "button",
+            "box": {
+              "x": 290,
+              "y": 1646.3,
+              "width": 58,
+              "height": 44,
+              "right": 348,
+              "bottom": 1690.3
+            },
+            "text": "发送",
+            "ariaLabel": "发送",
+            "title": ""
+          }
+        ],
+        "clipped_text": [],
+        "overlaps": [],
+        "unlabeled_images": [],
+        "main_landmark": true,
+        "live_regions": 1,
+        "log_regions": 1
+      }
+    },
+    {
+      "name": "mobile_390",
+      "checks": [
+        {
+          "name": "mobile_390_load",
+          "passed": true,
+          "detail": {
+            "http_status": 200,
+            "console_errors": [],
+            "page_errors": [],
+            "failed_requests": []
+          }
+        },
+        {
+          "name": "mobile_390_horizontal_overflow",
+          "passed": true,
+          "detail": {
+            "viewport": [
+              390,
+              844
+            ],
+            "document": [
+              390,
+              1729
+            ]
+          }
+        },
+        {
+          "name": "mobile_390_text_clipping",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "mobile_390_interactive_overlap",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "mobile_390_accessible_names",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "mobile_390_touch_targets",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "mobile_390_keyboard_focus",
+          "passed": true,
+          "detail": {
+            "focused": {
+              "element": "#btnContrast",
+              "outline": "solid 3px",
+              "boxShadow": "none"
+            }
+          }
+        },
+        {
+          "name": "mobile_390_semantics",
+          "passed": true,
+          "detail": {
+            "main_landmark": true,
+            "live_regions": 1,
+            "log_regions": 1,
+            "unlabeled_images": []
+          }
+        }
+      ],
+      "screenshot": "C:\\Users\\Liii\\Desktop\\BlindGuard\\evaluation\\accessibility\\mobile_390.png",
+      "layout": {
+        "viewport": [
+          390,
+          844
+        ],
+        "document": [
+          390,
+          1729
+        ],
+        "horizontal_overflow": false,
+        "targets": [
+          {
+            "element": "button#btnContrast.tool-btn",
+            "role": "button",
+            "box": {
+              "x": 281.1,
+              "y": 11.4,
+              "width": 94.9,
+              "height": 44,
+              "right": 376,
+              "bottom": 55.4
+            },
+            "text": "👁 大字模式",
+            "ariaLabel": "开启大字模式",
+            "title": "开启大字模式"
+          },
+          {
+            "element": "button#btnOverlay.tool-btn",
+            "role": "button",
+            "box": {
+              "x": 279.4,
+              "y": 90.8,
+              "width": 85.6,
+              "height": 44,
+              "right": 365,
+              "bottom": 134.8
+            },
+            "text": "标签层: 开",
+            "ariaLabel": "切换中文标签覆盖层",
+            "title": ""
+          },
+          {
+            "element": "button#btnStartSystem.btn.btn-success",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 497.6,
+              "width": 163,
+              "height": 44,
+              "right": 190,
+              "bottom": 541.6
+            },
+            "text": "启动系统",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button#btnStopSystem.btn.btn-danger",
+            "role": "button",
+            "box": {
+              "x": 200,
+              "y": 497.6,
+              "width": 163,
+              "height": 44,
+              "right": 363,
+              "bottom": 541.6
+            },
+            "text": "停止系统",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button#btnStartCamera.btn.btn-primary",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 551.6,
+              "width": 163,
+              "height": 44,
+              "right": 190,
+              "bottom": 595.6
+            },
+            "text": "开启摄像头",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button#btnStopCamera.btn.btn-secondary",
+            "role": "button",
+            "box": {
+              "x": 200,
+              "y": 551.6,
+              "width": 163,
+              "height": 44,
+              "right": 363,
+              "bottom": 595.6
+            },
+            "text": "关闭摄像头",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "div.upload-area",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 605.6,
+              "width": 336,
+              "height": 96,
+              "right": 363,
+              "bottom": 701.6
+            },
+            "text": "点击上传视频文件\n\n支持 mp4, avi, mov 等格式",
+            "ariaLabel": "上传视频文件",
+            "title": ""
+          },
+          {
+            "element": "button#btnStopVideo.btn.btn-secondary",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 711.6,
+              "width": 336,
+              "height": 44,
+              "right": 363,
+              "bottom": 755.6
+            },
+            "text": "停止视频",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 1553.5,
+              "width": 93,
+              "height": 44,
+              "right": 120,
+              "bottom": 1597.5
+            },
+            "text": "前面有什么",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 127,
+              "y": 1553.5,
+              "width": 119,
+              "height": 44,
+              "right": 246,
+              "bottom": 1597.5
+            },
+            "text": "现在能过马路吗",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 27,
+              "y": 1604.5,
+              "width": 119,
+              "height": 44,
+              "right": 146,
+              "bottom": 1648.5
+            },
+            "text": "周围有什么危险",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 153,
+              "y": 1604.5,
+              "width": 132,
+              "height": 44,
+              "right": 285,
+              "bottom": 1648.5
+            },
+            "text": "读一下路牌上的字",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "input#chatInput",
+            "role": "input",
+            "box": {
+              "x": 27,
+              "y": 1657.5,
+              "width": 218,
+              "height": 44,
+              "right": 245,
+              "bottom": 1701.5
+            },
+            "text": "",
+            "ariaLabel": "输入问题",
+            "title": ""
+          },
+          {
+            "element": "button#btnMic.btn.btn-secondary",
+            "role": "button",
+            "box": {
+              "x": 253,
+              "y": 1657.5,
+              "width": 44,
+              "height": 44,
+              "right": 297,
+              "bottom": 1701.5
+            },
+            "text": "🎤",
+            "ariaLabel": "语音输入",
+            "title": "语音输入"
+          },
+          {
+            "element": "button#btnSend.btn.btn-primary",
+            "role": "button",
+            "box": {
+              "x": 305,
+              "y": 1657.5,
+              "width": 58,
+              "height": 44,
+              "right": 363,
+              "bottom": 1701.5
+            },
+            "text": "发送",
+            "ariaLabel": "发送",
+            "title": ""
+          }
+        ],
+        "clipped_text": [],
+        "overlaps": [],
+        "unlabeled_images": [],
+        "main_landmark": true,
+        "live_regions": 1,
+        "log_regions": 1
+      }
+    },
+    {
+      "name": "desktop_1440",
+      "checks": [
+        {
+          "name": "desktop_1440_load",
+          "passed": true,
+          "detail": {
+            "http_status": 200,
+            "console_errors": [],
+            "page_errors": [],
+            "failed_requests": []
+          }
+        },
+        {
+          "name": "desktop_1440_horizontal_overflow",
+          "passed": true,
+          "detail": {
+            "viewport": [
+              1440,
+              1000
+            ],
+            "document": [
+              1440,
+              1380
+            ]
+          }
+        },
+        {
+          "name": "desktop_1440_text_clipping",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "desktop_1440_interactive_overlap",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "desktop_1440_accessible_names",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "desktop_1440_keyboard_focus",
+          "passed": true,
+          "detail": {
+            "focused": {
+              "element": "#btnContrast",
+              "outline": "solid 3px",
+              "boxShadow": "none"
+            }
+          }
+        },
+        {
+          "name": "desktop_1440_semantics",
+          "passed": true,
+          "detail": {
+            "main_landmark": true,
+            "live_regions": 1,
+            "log_regions": 1,
+            "unlabeled_images": []
+          }
+        }
+      ],
+      "screenshot": "C:\\Users\\Liii\\Desktop\\BlindGuard\\evaluation\\accessibility\\desktop_1440.png",
+      "layout": {
+        "viewport": [
+          1440,
+          1000
+        ],
+        "document": [
+          1440,
+          1380
+        ],
+        "horizontal_overflow": false,
+        "targets": [
+          {
+            "element": "button#btnContrast.tool-btn",
+            "role": "button",
+            "box": {
+              "x": 1325.1,
+              "y": 17.4,
+              "width": 94.9,
+              "height": 36,
+              "right": 1420,
+              "bottom": 53.4
+            },
+            "text": "👁 大字模式",
+            "ariaLabel": "开启大字模式",
+            "title": "开启大字模式"
+          },
+          {
+            "element": "button#btnOverlay.tool-btn",
+            "role": "button",
+            "box": {
+              "x": 917.4,
+              "y": 106.8,
+              "width": 85.6,
+              "height": 36,
+              "right": 1003,
+              "bottom": 142.8
+            },
+            "text": "标签层: 开",
+            "ariaLabel": "切换中文标签覆盖层",
+            "title": ""
+          },
+          {
+            "element": "button#btnStartSystem.btn.btn-success",
+            "role": "button",
+            "box": {
+              "x": 1059,
+              "y": 149.4,
+              "width": 156,
+              "height": 44,
+              "right": 1215,
+              "bottom": 193.4
+            },
+            "text": "启动系统",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button#btnStopSystem.btn.btn-danger",
+            "role": "button",
+            "box": {
+              "x": 1225,
+              "y": 149.4,
+              "width": 156,
+              "height": 44,
+              "right": 1381,
+              "bottom": 193.4
+            },
+            "text": "停止系统",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button#btnStartCamera.btn.btn-primary",
+            "role": "button",
+            "box": {
+              "x": 1059,
+              "y": 203.4,
+              "width": 156,
+              "height": 44,
+              "right": 1215,
+              "bottom": 247.4
+            },
+            "text": "开启摄像头",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button#btnStopCamera.btn.btn-secondary",
+            "role": "button",
+            "box": {
+              "x": 1225,
+              "y": 203.4,
+              "width": 156,
+              "height": 44,
+              "right": 1381,
+              "bottom": 247.4
+            },
+            "text": "关闭摄像头",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "div.upload-area",
+            "role": "button",
+            "box": {
+              "x": 1059,
+              "y": 257.4,
+              "width": 322,
+              "height": 92,
+              "right": 1381,
+              "bottom": 349.4
+            },
+            "text": "点击上传视频文件\n\n支持 mp4, avi, mov 等格式",
+            "ariaLabel": "上传视频文件",
+            "title": ""
+          },
+          {
+            "element": "button#btnStopVideo.btn.btn-secondary",
+            "role": "button",
+            "box": {
+              "x": 1059,
+              "y": 359.4,
+              "width": 322,
+              "height": 44,
+              "right": 1381,
+              "bottom": 403.4
+            },
+            "text": "停止视频",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 1059,
+              "y": 1217.3,
+              "width": 82,
+              "height": 32,
+              "right": 1141,
+              "bottom": 1249.3
+            },
+            "text": "前面有什么",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 1148,
+              "y": 1217.3,
+              "width": 106,
+              "height": 32,
+              "right": 1254,
+              "bottom": 1249.3
+            },
+            "text": "现在能过马路吗",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 1261,
+              "y": 1217.3,
+              "width": 106,
+              "height": 32,
+              "right": 1367,
+              "bottom": 1249.3
+            },
+            "text": "周围有什么危险",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "button.chip",
+            "role": "button",
+            "box": {
+              "x": 1059,
+              "y": 1256.3,
+              "width": 118,
+              "height": 32,
+              "right": 1177,
+              "bottom": 1288.3
+            },
+            "text": "读一下路牌上的字",
+            "ariaLabel": "",
+            "title": ""
+          },
+          {
+            "element": "input#chatInput",
+            "role": "input",
+            "box": {
+              "x": 1059,
+              "y": 1297.3,
+              "width": 204,
+              "height": 44,
+              "right": 1263,
+              "bottom": 1341.3
+            },
+            "text": "",
+            "ariaLabel": "输入问题",
+            "title": ""
+          },
+          {
+            "element": "button#btnMic.btn.btn-secondary",
+            "role": "button",
+            "box": {
+              "x": 1271,
+              "y": 1297.3,
+              "width": 44,
+              "height": 44,
+              "right": 1315,
+              "bottom": 1341.3
+            },
+            "text": "🎤",
+            "ariaLabel": "语音输入",
+            "title": "语音输入"
+          },
+          {
+            "element": "button#btnSend.btn.btn-primary",
+            "role": "button",
+            "box": {
+              "x": 1323,
+              "y": 1297.3,
+              "width": 58,
+              "height": 44,
+              "right": 1381,
+              "bottom": 1341.3
+            },
+            "text": "发送",
+            "ariaLabel": "发送",
+            "title": ""
+          }
+        ],
+        "clipped_text": [],
+        "overlaps": [],
+        "unlabeled_images": [],
+        "main_landmark": true,
+        "live_regions": 1,
+        "log_regions": 1
+      }
+    }
+  ],
+  "checks": [
+    {
+      "name": "mobile_375_load",
+      "passed": true,
+      "detail": {
+        "http_status": 200,
+        "console_errors": [],
+        "page_errors": [],
+        "failed_requests": []
+      }
+    },
+    {
+      "name": "mobile_375_horizontal_overflow",
+      "passed": true,
+      "detail": {
+        "viewport": [
+          375,
+          812
+        ],
+        "document": [
+          375,
+          1717
+        ]
+      }
+    },
+    {
+      "name": "mobile_375_text_clipping",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "mobile_375_interactive_overlap",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "mobile_375_accessible_names",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "mobile_375_touch_targets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "mobile_375_keyboard_focus",
+      "passed": true,
+      "detail": {
+        "focused": {
+          "element": "#btnContrast",
+          "outline": "solid 3px",
+          "boxShadow": "none"
+        }
+      }
+    },
+    {
+      "name": "mobile_375_semantics",
+      "passed": true,
+      "detail": {
+        "main_landmark": true,
+        "live_regions": 1,
+        "log_regions": 1,
+        "unlabeled_images": []
+      }
+    },
+    {
+      "name": "mobile_390_load",
+      "passed": true,
+      "detail": {
+        "http_status": 200,
+        "console_errors": [],
+        "page_errors": [],
+        "failed_requests": []
+      }
+    },
+    {
+      "name": "mobile_390_horizontal_overflow",
+      "passed": true,
+      "detail": {
+        "viewport": [
+          390,
+          844
+        ],
+        "document": [
+          390,
+          1729
+        ]
+      }
+    },
+    {
+      "name": "mobile_390_text_clipping",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "mobile_390_interactive_overlap",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "mobile_390_accessible_names",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "mobile_390_touch_targets",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "mobile_390_keyboard_focus",
+      "passed": true,
+      "detail": {
+        "focused": {
+          "element": "#btnContrast",
+          "outline": "solid 3px",
+          "boxShadow": "none"
+        }
+      }
+    },
+    {
+      "name": "mobile_390_semantics",
+      "passed": true,
+      "detail": {
+        "main_landmark": true,
+        "live_regions": 1,
+        "log_regions": 1,
+        "unlabeled_images": []
+      }
+    },
+    {
+      "name": "desktop_1440_load",
+      "passed": true,
+      "detail": {
+        "http_status": 200,
+        "console_errors": [],
+        "page_errors": [],
+        "failed_requests": []
+      }
+    },
+    {
+      "name": "desktop_1440_horizontal_overflow",
+      "passed": true,
+      "detail": {
+        "viewport": [
+          1440,
+          1000
+        ],
+        "document": [
+          1440,
+          1380
+        ]
+      }
+    },
+    {
+      "name": "desktop_1440_text_clipping",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "desktop_1440_interactive_overlap",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "desktop_1440_accessible_names",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "desktop_1440_keyboard_focus",
+      "passed": true,
+      "detail": {
+        "focused": {
+          "element": "#btnContrast",
+          "outline": "solid 3px",
+          "boxShadow": "none"
+        }
+      }
+    },
+    {
+      "name": "desktop_1440_semantics",
+      "passed": true,
+      "detail": {
+        "main_landmark": true,
+        "live_regions": 1,
+        "log_regions": 1,
+        "unlabeled_images": []
+      }
+    }
+  ]
+}

@@ -3,8 +3,10 @@
 import sys
 import os
 
+from core.version import VERSION
+
 print("=" * 60)
-print("BlindGuard 冒烟测试 (V2.1)")
+print(f"BlindGuard 冒烟测试 (V{VERSION})")
 print("=" * 60)
 
 # 1. 模块导入
@@ -47,7 +49,10 @@ try:
                  'confidence': 0.9, 'risk_level': 'high', 'light_state': 'red'}]
     ann_red = agent.generate_announcement(red_dets, 'high')
     print(f"  [OK] 红灯播报: {ann_red}")
+    safety_reply = agent.chat("现在能过马路吗？", red_dets, 'high')
+    print(f"  [OK] 红灯通行问题: {safety_reply}")
     assert ann and reply and '红灯' in ann_red
+    assert '不要通行' in ann_red and '不要通行' in safety_reply
     print(f"  [OK] 工具注册: {len(AGENT_TOOLS)} 个")
     st = agent.status()
     print(f"  [OK] Agent 状态: llm_active={st['llm_active']} tools_supported={st['tools_supported']} "
@@ -111,7 +116,7 @@ except Exception as e:
     sys.exit(1)
 
 # 6. 主应用初始化（加载 YOLO 模型）
-print("\n[6/7] 初始化主应用（加载 best.pt 模型，需要几秒）...")
+print("\n[6/7] 初始化主应用（加载配置中的主辅模型，需要几秒）...")
 try:
     from app import BlindGuardApp
     app_obj = BlindGuardApp()

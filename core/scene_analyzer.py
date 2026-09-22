@@ -73,13 +73,17 @@ class SceneAnalyzer:
             - movement_analysis: 运动分析
             - summary: 场景摘要
         """
-        if not detections:
-            return self._empty_scene_result()
-
         # 帧宽度用于方位统计（传入 None 时退回默认 640）
         frame_width = 640
         if frame is not None and hasattr(frame, 'shape') and len(frame.shape) >= 2:
             frame_width = max(1, frame.shape[1])
+
+        if not detections:
+            result = self._empty_scene_result()
+            result['movement_analysis'] = self._analyze_movement([], frame_width)
+            result['detections'] = []
+            self.prev_analysis = result
+            return result
 
         # 目标分布分析
         distribution = self._analyze_distribution(detections)
@@ -88,7 +92,7 @@ class SceneAnalyzer:
         spatial = self._analyze_spatial(detections, frame_width)
 
         # 运动分析
-        movement = self._analyze_movement(detections)
+        movement = self._analyze_movement(detections, frame_width)
 
         # 确定场景类型
         scene_type = self._determine_scene_type(detections, distribution)
@@ -202,19 +206,89 @@ class SceneAnalyzer:
             'dominant_side': self._get_dominant_side(left_count, center_count, right_count)
         }
 
-    def _analyze_movement(self, detections: List[Dict]) -> Dict:
+    def _analyze_movement(self, detections: List[Dict],
+                          frame_width: int = 640) -> Dict:
         """
         运动分析
-        通过对比前后帧分析目标运动状态
+        优先按 track_id 做前后帧匹配；没有稳定 ID 时退回类别数量差分。
         """
+        base_result = {
+            'new_objects': len(detections),
+            'disappeared_objects': 0,
+            'approaching_count': 0,
+            'receding_count': 0,
+            'lateral_count': 0,
+            'matched_objects': 0,
+            'movement_trend': 'initial',
+            'change_magnitude': len(detections),
+        }
         if self.prev_analysis is None:
-            return {
-                'new_objects': len(detections),
-                'disappeared_objects': 0,
-                'movement_trend': 'initial'
-            }
+            return base_result
 
         prev_detections = self.prev_analysis.get('detections', [])
+        prev_by_id = {
+            det.get('track_id'): det for det in prev_detections
+            if det.get('track_id') is not None
+        }
+        curr_by_id = {
+            det.get('track_id'): det for det in detections
+            if det.get('track_id') is not None
+        }
+
+        if prev_by_id and curr_by_id:
+            common_ids = set(prev_by_id) & set(curr_by_id)
+            approaching = receding = lateral = matched = 0
+            for track_id in common_ids:
+                previous = prev_by_id[track_id]
+                current = curr_by_id[track_id]
+                prev_area = float(previous.get('area_ratio') or 0)
+                curr_area = float(current.get('area_ratio') or 0)
+                if prev_area > 0 and curr_area > 0:
+                    matched += 1
+                    ratio = curr_area / prev_area
+                    if ratio >= 1.15:
+                        approaching += 1
+                    elif ratio <= 1 / 1.15:
+                        receding += 1
+
+                prev_box = previous.get('bbox') or []
+                curr_box = current.get('bbox') or []
+                if len(prev_box) >= 4 and len(curr_box) >= 4:
+                    prev_cx = (prev_box[0] + prev_box[2]) / 2
+                    curr_cx = (curr_box[0] + curr_box[2]) / 2
+                    lateral_threshold = max(
+                        8.0, (prev_box[2] - prev_box[0]) * 0.15,
+                        frame_width * 0.03)
+                    if abs(curr_cx - prev_cx) >= lateral_threshold:
+                        lateral += 1
+
+            new_objects = len(set(curr_by_id) - set(prev_by_id))
+            disappeared = len(set(prev_by_id) - set(curr_by_id))
+            total_change = new_objects + disappeared
+            if approaching > receding and approaching > 0:
+                trend = 'approaching'
+            elif receding > approaching and receding > 0:
+                trend = 'receding'
+            elif new_objects > disappeared:
+                trend = 'increasing'
+            elif disappeared > new_objects:
+                trend = 'decreasing'
+            elif lateral or total_change:
+                trend = 'changing'
+            else:
+                trend = 'stable'
+            return {
+                'new_objects': new_objects,
+                'disappeared_objects': disappeared,
+                'approaching_count': approaching,
+                'receding_count': receding,
+                'lateral_count': lateral,
+                'matched_objects': matched,
+                'movement_trend': trend,
+                'change_magnitude': total_change,
+            }
+
+        # 无法稳定关联轨迹时，保留原有类别数量差分兜底。
         prev_classes = Counter(d['class_name'] for d in prev_detections)
         curr_classes = Counter(d['class_name'] for d in detections)
 
@@ -243,6 +317,10 @@ class SceneAnalyzer:
         return {
             'new_objects': new_objects,
             'disappeared_objects': disappeared,
+            'approaching_count': 0,
+            'receding_count': 0,
+            'lateral_count': 0,
+            'matched_objects': 0,
             'movement_trend': trend,
             'change_magnitude': total_change
         }
@@ -330,6 +408,10 @@ class SceneAnalyzer:
             summary_parts.append("有新目标出现")
         elif trend == 'decreasing':
             summary_parts.append("有目标离开视野")
+        elif trend == 'approaching':
+            summary_parts.append("有目标正在接近")
+        elif trend == 'receding':
+            summary_parts.append("有目标正在远离")
 
         return '，'.join(summary_parts)
 

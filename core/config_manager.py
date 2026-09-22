@@ -34,11 +34,16 @@ class ConfigManager:
     DEFAULT_CONFIG = {
         # 模型配置
         'model': {
-            'path': 'best.pt',
+            'path': 'best_s.pt',
+            'aux_model_path': 'best.pt',
             'confidence_threshold': 0.45,
             'iou_threshold': 0.5,
             'device': '',
-            'img_size': 640
+            'img_size': 960,
+            'aux_img_size': 640,
+            'portrait_crop': True,
+            'focus_classes': [],
+            'aux_classes': []
         },
 
         # 智能体配置（详细说明见 config.yaml）
@@ -59,10 +64,24 @@ class ConfigManager:
             },
             'announce': {
                 'cooldown': 3.0,
-                'memory_size': 8
+                'memory_size': 8,
+                'min_level': 'medium',
+                'min_confidence': 0.45
             },
             'chat': {
                 'max_history': 6
+            },
+            'architecture': {
+                'version': '2.5.0',
+                'max_tool_rounds': 3,
+                'max_model_tool_calls': 6,
+                'tool_trace_size': 80,
+                'event_history_size': 40,
+                'announcement_history_size': 20,
+                'enable_intent_planner': True,
+                'enable_tool_prefetch': True,
+                'enable_specialist_team': True,
+                'max_specialist_roles': 3
             }
         },
 
@@ -110,6 +129,14 @@ class ConfigManager:
             'language': 'zh-CN',
             'show_fps': True,
             'show_detection_count': True
+        },
+
+        # Web 服务配置
+        'server': {
+            'host': '127.0.0.1',
+            'port': 5000,
+            'debug': False,
+            'auth_token': ''
         }
     }
 
@@ -128,6 +155,7 @@ class ConfigManager:
         'BLINDGUARD_VOICE_COOLDOWN': ('voice.cooldown', float),
         'BLINDGUARD_SERVER_HOST': ('server.host', str),
         'BLINDGUARD_SERVER_PORT': ('server.port', int),
+        'BLINDGUARD_SERVER_TOKEN': ('server.auth_token', str),
         'BLINDGUARD_AGENT_ENABLED': ('agent.enabled', '_bool'),
         'BLINDGUARD_AGENT_LLM_BASE_URL': ('agent.llm.base_url', str),
         'BLINDGUARD_AGENT_LLM_API_KEY': ('agent.llm.api_key', str),
@@ -136,6 +164,16 @@ class ConfigManager:
         'BLINDGUARD_AGENT_VISION_API_KEY': ('agent.vision.api_key', str),
         'BLINDGUARD_AGENT_VISION_MODEL': ('agent.vision.model', str),
     }
+
+    # 旧版段名：这些段会被 _convert_config 结构性转换为内部段名
+    # （detector->model、risk_engine->risk、announcer->voice）。
+    # 用于判断"源 YAML 是否经过结构转换"，从而决定 save() 是否能安全回写。
+    _CONVERTED_SOURCE_SECTIONS = ('detector', 'risk_engine', 'announcer')
+
+    # save() 在"源 YAML 经结构转换"时改写的独立运行时快照文件名。
+    # 源 config.yaml 是用户手工维护、含大量中文注释的文件，
+    # yaml.safe_dump 无法保留注释且会把段名改写为内部名，故绝不回写覆盖它。
+    RUNTIME_SNAPSHOT_NAME = 'config.runtime.json'
 
     def __init__(self, config_path: Optional[str] = None):
         """
@@ -156,6 +194,10 @@ class ConfigManager:
 
         # 运行时配置
         self._config = {}
+
+        # 源 YAML 是否经过结构转换（含旧版段名）。
+        # 在 _load_config 中置位，供 save() 判断能否安全回写源文件。
+        self._legacy_source_sections = False
 
         # 加载配置
         self._load_config()
@@ -216,7 +258,7 @@ class ConfigManager:
                         file_config = json.load(f)
 
                     if file_config:
-                        self._convert_config(file_config)
+                        self._legacy_source_sections=any(x in file_config for x in self._CONVERTED_SOURCE_SECTIONS);self._convert_config(file_config)
                         self._merge_config(self._config, file_config)
                         logger.info(f"已加载配置文件: {self.config_path}")
             except Exception as e:
@@ -317,7 +359,24 @@ class ConfigManager:
         logger.debug(f"配置已更新: {key} = {value}")
 
     def save(self):
-        """保存配置到文件（按扩展名选择格式，不损坏 YAML）"""
+        """保存配置到文件（按扩展名选择格式）。
+
+        安全语义（保存与加载分离）：若源 config.yaml 经 _convert_config
+        结构转换而来（含 detector/risk_engine/announcer 旧段名），本方法
+        【不回写覆盖】它——yaml.safe_dump 无法保留中文注释，且会把段名改写为
+        内部名（model/risk/voice），将摧毁用户手工维护的 YAML。此时记录警告并
+        改存独立快照 config.runtime.json。其余情况（JSON 目标、或本就使用内部
+        段名的 YAML）按扩展名正常写回。当前 app 未调用 save()。
+        """
+        # 源 YAML 经结构转换：拒绝结构性回写源文件，改存独立运行时快照
+        if self.config_path.suffix in ('.yaml', '.yml') and self._legacy_source_sections:
+            logger.warning(
+                f"源配置 {self.config_path} 含旧版段名(detector/risk_engine/announcer)，"
+                f"经结构转换加载；为避免丢失中文注释与改写段结构，save() 不回写源 YAML。"
+            )
+            self.save_runtime_snapshot()
+            return
+
         try:
             # 确保目录存在
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -337,6 +396,16 @@ class ConfigManager:
 
         except Exception as e:
             logger.error(f"保存配置失败: {e}")
+
+    def save_runtime_snapshot(self):
+        # 源YAML含旧版段名时,save()改存此独立JSON快照,避免回写摧毁手工维护的YAML
+        sp = self.config_path.parent / self.RUNTIME_SNAPSHOT_NAME
+        try:
+            with open(sp, 'w', encoding='utf-8') as f:
+                json.dump(self._config, f, indent=2, ensure_ascii=False)
+            logger.info('运行时配置快照已保存到: %s' % sp)
+        except Exception as e:
+            logger.error('保存运行时配置快照失败: %s' % e)
 
     def get_section(self, section: str) -> Dict:
         """
@@ -428,7 +497,8 @@ class ConfigManager:
         """
         try:
             # 检查必要字段
-            required_sections = ['model', 'risk', 'voice', 'camera', 'system']
+            required_sections = [
+                'model', 'risk', 'voice', 'camera', 'system', 'server']
             for section in required_sections:
                 if section not in self._config:
                     logger.error(f"缺少必要配置段: {section}")

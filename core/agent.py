@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-智能体核心模块（V2.1）
+智能体核心模块（V2.5）
 
-在传统 CV 管线（检测→跟踪→风险→语音）之上叠加一层真正的 Agent：
-1. 工具调用（Function Calling）：LLM 可自主调用 查检测/查场景/查记忆/看画面/
-   读写用户偏好 等工具，能回答"现在能过马路吗"这类需要组合推理的问题，
-   而不是只依赖塞进上下文的静态摘要
-2. 自然语言播报：LLM 结合检测结果、红绿灯状态、跟踪趋势与时序记忆生成口语化提示
-3. 多模态感知（可选）：接入 OpenAI 兼容的多模态端点（Qwen-VL/GLM-4V 等），
-   Agent 需要时"亲眼看"画面，识别文字、标志与 YOLO 类别之外的异常
-4. 用户偏好长期记忆：JSON 持久化（语速/播报详略），由应用层应用到设备
-5. 离线兜底：未配置密钥或调用失败时回退模板播报与本地对话，系统完整可用
+在传统 CV 管线（检测→跟踪→风险→语音）之上叠加编排式多能力 Agent：
+1. 安全守门员：红灯/黄灯/高风险/未知灯色确定性拦截，任何输出都不得授权通行
+2. 工具注册表：统一 schema 校验、读写权限、安全级别、超时、异常和调用审计
+3. 专业能力：实时感知、风险分析、时序事件、视觉观察、偏好管家、运行监控
+4. 编排循环：本地意图路由 → LLM/工具计划 → 行动 → 安全复核 → 有界运行轨迹
+5. 主动播报：紧急度评分、原因排序、LLM/模板生成、安全复核和历史上限
+6. 离线兜底：未配置密钥或调用失败时回退模板播报与本地确定性对话
 
 LLM 走 OpenAI 兼容 /chat/completions，仅用标准库 urllib，不引入新依赖。
 """
@@ -20,13 +18,21 @@ import json
 import time
 import base64
 import logging
+import threading
 import urllib.request
 import urllib.error
 from collections import deque
 from typing import Dict, List, Optional
 
+from core.agent_orchestrator import (
+    AgentOrchestrator,
+    SPECIALISTS,
+    assess_announcement,
+)
+from core.agent_tools import ToolRegistry
 from core.config_manager import ConfigManager
 from core.labels import get_class_cn
+from core import safety_policy
 from core.traffic_light import STATE_CN
 
 logger = logging.getLogger('BlindGuard.Agent')
@@ -39,6 +45,9 @@ TREND_CN = {'approaching': '正在接近', 'receding': '正在远离'}
 SYSTEM_PROMPT = (
     "你是 BlindGuard 智能导盲系统的核心助手，服务对象是视障人士。"
     "你会收到摄像头检测出的目标（类别、风险等级、方位、红绿灯状态、运动趋势）以及最近若干帧的时序记忆。"
+    "安全规则具有最高优先级：你只能描述检测结果，绝不能批准、建议或保证用户通行。"
+    "不得输出“可以通行”“安全通行”“放心走”“能过马路”等肯定结论。"
+    "即使看到绿灯，也必须说明系统无法确认路口是否安全，请用户结合盲杖、交通规则和人工判断。"
     "任务一【播报】：生成一句简短、自然、口语化的中文语音提示，"
     "优先提醒高风险、近距离、正前方、正在接近的目标；不超过 20 个字，不要堆砌细节，不要解释自己是 AI。"
     "任务二【对话】：回答用户关于周围环境的提问，回答不超过 80 字，基于检测结果与工具结果如实描述，"
@@ -92,9 +101,50 @@ AGENT_TOOLS = [
                                      'announce_detail 为 concise(简短) 或 detailed(详细)'},
         }, 'required': ['key', 'value']},
     }},
+    {'type': 'function', 'function': {
+        'name': 'get_risk_assessment',
+        'description': '获取结构化风险分析：整体风险、优先避让目标、风险原因、'
+                       '各等级数量与安全边界说明',
+        'parameters': {'type': 'object', 'properties': {}, 'required': []},
+    }},
+    {'type': 'function', 'function': {
+        'name': 'get_navigation_guidance',
+        'description': '获取非通行类无障碍导航建议：停步、减速、盲杖确认、'
+                       '左右侧障碍分布和优先避让对象。该工具不会授权过街或通行',
+        'parameters': {'type': 'object', 'properties': {}, 'required': []},
+    }},
+    {'type': 'function', 'function': {
+        'name': 'get_environment_trends',
+        'description': '获取近期事件流和运动趋势，包括目标出现/消失、接近/远离、'
+                       '红绿灯变化和风险升级；用于回答“刚才发生了什么”类问题',
+        'parameters': {'type': 'object', 'properties': {}, 'required': []},
+    }},
+    {'type': 'function', 'function': {
+        'name': 'get_system_health',
+        'description': '获取智能体运行健康：LLM 在线/降级、工具协议、VLM、'
+                       '记忆帧数、最近工具调用与错误信息',
+        'parameters': {'type': 'object', 'properties': {}, 'required': []},
+    }},
+    {'type': 'function', 'function': {
+        'name': 'get_agent_capabilities',
+        'description': '获取智能体架构、专业角色、工具清单及其读写权限，'
+                       '用于解释系统能做什么和安全边界',
+        'parameters': {'type': 'object', 'properties': {}, 'required': []},
+    }},
+    {'type': 'function', 'function': {
+        'name': 'get_announcement_history',
+        'description': '获取最近主动语音播报及其风险、紧急度和生成路径',
+        'parameters': {'type': 'object', 'properties': {}, 'required': []},
+    }},
+    {'type': 'function', 'function': {
+        'name': 'get_alert_policy',
+        'description': '解释当前是否达到主动播报门槛、紧急度、冷却和保守静默原因；'
+                       '静默只表示未达到播报门槛，不代表环境安全',
+        'parameters': {'type': 'object', 'properties': {}, 'required': []},
+    }},
 ]
 
-# 单轮对话最多允许的工具调用轮数
+# 兼容旧调用方的默认值；实例可通过 agent.architecture.max_tool_rounds 覆盖
 MAX_TOOL_ROUNDS = 3
 
 
@@ -132,6 +182,34 @@ class BlindGuardAgent:
         chat = config.get('chat', {}) or {}
         self.max_history = int(chat.get('max_history', 6))
 
+        architecture = config.get('architecture', {}) or {}
+        self.agent_version = str(architecture.get('version', '2.5.0'))
+        self.max_tool_rounds = int(
+            architecture.get('max_tool_rounds', MAX_TOOL_ROUNDS)
+        )
+        self.max_model_tool_calls = int(
+            architecture.get('max_model_tool_calls', 6)
+        )
+        self.max_specialist_roles = int(
+            architecture.get('max_specialist_roles', 3)
+        )
+        self.tool_trace_size = int(architecture.get('tool_trace_size', 80))
+        self.event_history_size = int(
+            architecture.get('event_history_size', 40)
+        )
+        self.announcement_history_size = int(
+            architecture.get('announcement_history_size', 20)
+        )
+        self.intent_planner_enabled = bool(
+            architecture.get('enable_intent_planner', True)
+        )
+        self.tool_prefetch_enabled = bool(
+            architecture.get('enable_tool_prefetch', True)
+        )
+        self.specialist_execution_enabled = bool(
+            architecture.get('enable_specialist_team', True)
+        )
+
         # 端点是否支持 tools（首次报错自动降级为纯上下文模式）
         self.tools_supported = True
 
@@ -139,14 +217,27 @@ class BlindGuardAgent:
         # 避免端点不可达时每次对话/播报都傻等超时
         self._fail_count = 0
         self._fail_skip_until = 0.0
+        self._llm_degraded = False
+        self._last_error = ''
         self.FAIL_TRIP_THRESHOLD = 3
         self.FAIL_SKIP_SECONDS = 30.0
 
         # 应用上下文（由 BlindGuardApp 注入，提供工具所需的数据源）
         self.context = None
 
+        # 共享状态锁：检测管线线程（update_memory）、播报后台线程
+        # （generate_announcement）与 Flask Web 线程（chat/状态接口）会并发
+        # 读写下方 5 个结构。用可重入锁保护，杜绝“遍历时被另一线程追加”
+        # 引发的 RuntimeError: deque mutated during iteration。
+        # 读路径一律在锁内取 list 快照、锁外迭代，避免长持锁阻塞检测管线。
+        self._state_lock = threading.RLock()
+
         # 时序记忆：滑动窗口，每帧一个快照
         self.memory: deque = deque(maxlen=self.memory_size)
+        # 从帧间差异聚合的事件流，避免把连续帧当成独立风险
+        self.event_history: deque = deque(
+            maxlen=max(1, self.event_history_size)
+        )
         # 对话历史 [(role, content), ...]
         self.chat_history: List[Dict] = []
 
@@ -158,6 +249,27 @@ class BlindGuardAgent:
 
         self.last_announce_time = 0.0
         self.last_announce_text = ''
+        self.announcement_history: deque = deque(
+            maxlen=max(1, self.announcement_history_size)
+        )
+
+        # 工具注册表和编排层：外部仍只依赖 BlindGuardAgent 公共接口
+        self.tool_registry = ToolRegistry()
+        self._register_tools()
+        self.orchestrator = AgentOrchestrator(
+            self,
+            max_tool_rounds=self.max_tool_rounds,
+            trace_size=self.tool_trace_size,
+            max_model_tool_calls=self.max_model_tool_calls,
+            max_specialist_roles=self.max_specialist_roles,
+        )
+        self.orchestrator.intent_planner_enabled = (
+            self.intent_planner_enabled
+        )
+        self.orchestrator.tool_prefetch_enabled = self.tool_prefetch_enabled
+        self.orchestrator.specialist_execution_enabled = (
+            self.specialist_execution_enabled
+        )
 
         # LLM 是否真正可用（需同时有 base_url 和 api_key）
         self.llm_ok = bool(self.enabled and self.base_url and self.api_key)
@@ -199,7 +311,10 @@ class BlindGuardAgent:
         if scene is not None:
             self._last_scene = scene
         snapshot = self._summarize_frame(detections, risk_level, frame_w, frame_h)
-        self.memory.append(snapshot)
+        # 事件跟踪（读 memory[-1]、写 event_history）与记忆追加须与读路径互斥
+        with self._state_lock:
+            self._track_events(snapshot)
+            self.memory.append(snapshot)
 
     def _summarize_frame(self, detections, risk_level, frame_w, frame_h) -> Dict:
         items = []
@@ -227,12 +342,136 @@ class BlindGuardAgent:
             items.append(item)
         return {'t': round(time.time(), 1), 'risk': risk_level, 'items': items}
 
+    def _track_events(self, snapshot: Dict) -> None:
+        """Aggregate frame-to-frame changes into a bounded semantic event log."""
+        previous = self.memory[-1] if self.memory else None
+        if previous is None:
+            self._append_event(
+                event_type="memory_started",
+                severity=snapshot.get("risk", "safe"),
+                text="开始记录环境事件",
+                target="",
+            )
+            return
+
+        old_items = {
+            self._event_item_key(item): item
+            for item in previous.get("items", [])
+        }
+        new_items = {
+            self._event_item_key(item): item
+            for item in snapshot.get("items", [])
+        }
+
+        for key, item in new_items.items():
+            old = old_items.get(key)
+            risk = str(item.get("risk") or "safe")
+            name = str(item.get("name") or "目标")
+            if old is None and risk in ("critical", "high", "medium"):
+                self._append_event(
+                    event_type="target_appeared",
+                    severity=risk,
+                    text=f"{name}进入视野",
+                    target=key,
+                )
+            if item.get("trend") == "approaching" and (
+                old is None or old.get("trend") != "approaching"
+            ):
+                self._append_event(
+                    event_type="approaching",
+                    severity=risk,
+                    text=f"{name}正在接近",
+                    target=key,
+                )
+            if item.get("trend") == "receding" and (
+                old is None or old.get("trend") != "receding"
+            ):
+                self._append_event(
+                    event_type="receding",
+                    severity="low",
+                    text=f"{name}正在远离",
+                    target=key,
+                )
+            if item.get("light") and (
+                old is None or old.get("light") != item.get("light")
+            ):
+                self._append_event(
+                    event_type="traffic_light",
+                    severity=risk,
+                    text=(
+                        f"红绿灯变为"
+                        f"{STATE_CN.get(item['light'], item['light'])}"
+                    ),
+                    target=key,
+                )
+
+        for key, item in old_items.items():
+            if key not in new_items and item.get("risk") in (
+                "critical", "high", "medium"
+            ):
+                self._append_event(
+                    event_type="target_left",
+                    severity="low",
+                    text=f"{item.get('name', '目标')}离开视野",
+                    target=key,
+                )
+
+        old_rank = RISK_ORDER.get(previous.get("risk", "safe"), 4)
+        new_rank = RISK_ORDER.get(snapshot.get("risk", "safe"), 4)
+        if new_rank < old_rank:
+            self._append_event(
+                event_type="risk_escalated",
+                severity=snapshot.get("risk", "safe"),
+                text=(
+                    f"整体风险从{previous.get('risk', 'safe')}"
+                    f"升为{snapshot.get('risk', 'safe')}"
+                ),
+                target="overall",
+            )
+
+    def _append_event(self, *, event_type: str, severity: str,
+                      text: str, target: str) -> None:
+        now = time.time()
+        # 事件去重窗口：在最近 N 条内按“类型+目标+时间”查重，而非只看最后一条，
+        # 避免同一事件被交错的其他事件“隔开”后在短时间内重复记录
+        with self._state_lock:
+            for event in list(self.event_history)[-5:]:
+                if (
+                    event.get("type") == event_type
+                    and event.get("target") == target
+                    and now - float(event.get("timestamp", 0)) < 6.0
+                ):
+                    return
+            self.event_history.append({
+                "timestamp": round(now, 3),
+                "time": time.strftime("%H:%M:%S"),
+                "type": event_type,
+                "severity": severity,
+                "text": text,
+                "target": target,
+            })
+
+    @staticmethod
+    def _event_item_key(item: Dict) -> str:
+        # 有 track_id（生产默认，跟踪器开启）时用它做实例级唯一键，无碰撞。
+        # 无 track_id 的兜底用“类名:方位”粗粒度键：此时 trend 不会设置，
+        # 接近/远离事件本就不触发，只剩 出现/离开/灯色 事件；同类同区的
+        # 第二个目标被合并只会“少报”而非“误报”，方向保守、可接受。
+        # 故意不按面积/位置细分——目标移动会让键跨帧漂移，导致同一目标被
+        # 反复判为“离开+出现”，事件刷屏甚至触发多余播报（反保守，禁止）。
+        if item.get("id") is not None:
+            return f"id:{item.get('id')}"
+        return f"{item.get('name', '')}:{item.get('zone', '')}"
+
     def _memory_text(self) -> str:
-        if not self.memory:
+        # 锁内取 list 快照、锁外迭代，避免遍历 deque 时被检测管线线程追加
+        with self._state_lock:
+            memory_snapshot = list(self.memory)
+        if not memory_snapshot:
             return '（暂无历史记忆）'
         lines = []
-        n = len(self.memory)
-        for i, snap in enumerate(self.memory):
+        n = len(memory_snapshot)
+        for i, snap in enumerate(memory_snapshot):
             names = []
             for it in snap['items']:
                 tag = ''
@@ -247,7 +486,21 @@ class BlindGuardAgent:
                 f"近第{n - i}帧[整体{snap['risk']}]: "
                 + (', '.join(names) if names else '无目标')
             )
+        event_lines = self._event_text(limit=4)
+        if event_lines:
+            lines.append("近期事件:\n" + event_lines)
         return '\n'.join(lines)
+
+    def _event_text(self, limit: int = 8) -> str:
+        # 锁内取快照，避免“判空”与“切片”之间被另一线程追加或清空
+        with self._state_lock:
+            events = list(self.event_history)
+        if not events:
+            return ""
+        return "\n".join(
+            f"[{event.get('time', '')}] {event.get('text', '')}"
+            for event in events[-max(1, limit):]
+        )
 
     # ==================== 播报生成 ====================
 
@@ -276,34 +529,37 @@ class BlindGuardAgent:
 
         无目标时返回 None（由调用方决定是否播报"前方通畅"）。
         """
-        if not detections:
-            return None
+        return self.orchestrator.generate_announcement(
+            list(detections or []), risk_level, frame_w, frame_h
+        )
 
-        detail = self._preferences().get('announce_detail', 'concise')
-        if not self.llm_ok:
-            text = self._fallback_announce(detections, frame_w)
-        else:
-            text = self._llm_announce(detections, risk_level, frame_w, detail)
-            if not text:
-                text = self._fallback_announce(detections, frame_w)
-
-        # 去抖：与上一次相同且未过冷却，则跳过
-        now = time.time()
-        if (text == self.last_announce_text
-                and now - self.last_announce_time < self.announce_cooldown * 2):
-            return None
-        self.last_announce_time = now
-        self.last_announce_text = text
-        return text
+    def _record_announcement(self, *, text: str, risk_level: str,
+                             urgency: Dict, path: str) -> None:
+        record = {
+            'time': time.strftime('%H:%M:%S'),
+            'timestamp': round(time.time(), 3),
+            'text': text,
+            'risk_level': risk_level,
+            'urgency': urgency.get('urgency', 'low'),
+            'score': urgency.get('score', 0),
+            'reasons': list(urgency.get('reasons') or []),
+            'path': path,
+        }
+        # 播报历史会被状态接口并发读，append 须在锁内
+        with self._state_lock:
+            self.announcement_history.append(record)
 
     def _fallback_announce(self, detections, frame_w: int = 640) -> str:
         """无 LLM 时的模板播报（含红绿灯与接近趋势）"""
         # 红灯优先：过马路场景的硬约束
         red = next((d for d in detections
-                    if d.get('light_state') == 'red'
-                    and d.get('risk_level') in ('critical', 'high', 'medium')), None)
+                    if d.get('light_state') == 'red'), None)
         if red is not None:
-            return "红灯，请等待绿灯再通行"
+            return "红灯，请等待，不要通行"
+        yellow = next((d for d in detections
+                       if d.get('light_state') == 'yellow'), None)
+        if yellow is not None:
+            return "黄灯，请等待，不要通行"
 
         best = min(
             detections,
@@ -315,6 +571,8 @@ class BlindGuardAgent:
         prefix = {'critical': '危险！', 'high': '危险！',
                   'medium': '注意，', 'low': '', 'safe': ''}.get(level, '')
         zone = self._zone(self._center_x(best), frame_w)
+        if best.get('light_state') == 'green':
+            return "绿灯，请自行确认路况，不能据此判断可通行"
         if best.get('trend') == 'approaching':
             return f"{prefix}{zone}{cn}正在接近，注意避让"
         return f"{prefix}{zone}有{cn}"
@@ -362,73 +620,45 @@ class BlindGuardAgent:
         用户主动提问。LLM 可在回答前调用工具（查检测/场景/记忆/看图/偏好），
         形成"感知-推理-行动"的 Agent 循环。
         """
-        if not self.llm_ok:
-            return self._fallback_chat(user_message,
-                                       detections if detections is not None
-                                       else self._current_detections())
-
         if detections is None:
             detections = self._current_detections()
-
-        det_text = (self._format_detections(detections, frame_w)
-                    if detections else '（当前无活跃检测）')
-        ctx = (
-            f"用户提问：{user_message}\n"
-            f"当前环境检测结果：\n{det_text}\n"
-            f"最近记忆：\n{self._memory_text()}\n"
-            f"整体风险：{risk_level}\n"
-            "如以上信息不足以回答，请调用工具获取；请基于真实信息回答，不超过 80 字。"
+        return self.orchestrator.chat(
+            user_message,
+            list(detections or []),
+            risk_level,
+            frame_w,
+            frame_h,
         )
-        msgs = [{'role': 'system', 'content': self._system_prompt()}]
-        # 注入最近对话历史，保留多轮上下文
-        msgs.extend(self.chat_history[-self.max_history * 2:])
-        msgs.append({'role': 'user', 'content': ctx})
 
-        reply = ''
-        if self.tools_supported:
-            for _ in range(MAX_TOOL_ROUNDS):
-                msg = self._call_llm(msgs, max_tokens=300, tools=AGENT_TOOLS)
-                calls = msg.get('tool_calls')
-                if not calls:
-                    reply = self._clean(msg.get('content') or '')
-                    break
-                # 原样回填 assistant 的工具调用消息，再逐个执行并回填结果
-                msgs.append(msg)
-                for tc in calls:
-                    fn = tc.get('function') or {}
-                    result = self._execute_tool(fn.get('name', ''),
-                                                fn.get('arguments') or '{}')
-                    logger.info(f"Agent 工具调用: {fn.get('name')}({str(fn.get('arguments'))[:80]})")
-                    msgs.append({'role': 'tool',
-                                 'tool_call_id': tc.get('id', ''),
-                                 'content': result})
+    def _remember_chat(self, user_message: str, reply: str):
+        """Persist one clean user/assistant pair with bounded history."""
+        # 对话历史会被 chat 与状态接口并发读写，整个追加/裁剪须在锁内
+        with self._state_lock:
+            self.chat_history.append({'role': 'user', 'content': user_message})
+            self.chat_history.append({'role': 'assistant', 'content': reply})
+            if len(self.chat_history) > self.max_history * 2:
+                self.chat_history = self.chat_history[-self.max_history * 2:]
 
-        if not reply:
-            # 工具轮数用尽仍未产出文本，或端点不支持 tools：补一次无工具调用兜底
-            final = self._call_llm(msgs, max_tokens=200)
-            reply = self._clean(final.get('content') or '')
-        if not reply:
-            reply = self._fallback_chat(user_message, detections)
-
-        # 保存干净的问答对到历史
-        self.chat_history.append({'role': 'user', 'content': user_message})
-        self.chat_history.append({'role': 'assistant', 'content': reply})
-        if len(self.chat_history) > self.max_history * 2:
-            self.chat_history = self.chat_history[-self.max_history * 2:]
-        return reply
-
-    def _fallback_chat(self, user_message: str, detections) -> str:
+    def _fallback_chat(self, user_message: str, detections,
+                       risk_level: str = 'safe') -> str:
         """无 LLM 时的本地对话：基于检测结果直接回答"""
+        decision = safety_policy.evaluate_passage_question(
+            user_message, detections, risk_level)
+        if decision.is_passage_question:
+            return decision.reply
         if not detections:
             return '当前没有看到周围目标，请把摄像头对准环境后再问。'
 
         red = next((d for d in detections if d.get('light_state') == 'red'), None)
+        yellow = next((d for d in detections if d.get('light_state') == 'yellow'), None)
         green = next((d for d in detections if d.get('light_state') == 'green'), None)
         light_hint = ''
         if red is not None:
-            light_hint = '红绿灯亮红灯，请等待绿灯再通行。'
+            light_hint = '红灯亮，请等待，不要通行。'
+        elif yellow is not None:
+            light_hint = '黄灯亮，请等待，不要通行。'
         elif green is not None:
-            light_hint = '红绿灯亮绿灯，注意观察后可通行。'
+            light_hint = '检测到绿灯，但系统不能确认路口安全。'
 
         names = []
         for d in detections:
@@ -448,37 +678,343 @@ class BlindGuardAgent:
             return SYSTEM_PROMPT_WITH_TOOLS
         return SYSTEM_PROMPT
 
+    def _register_tools(self) -> None:
+        """Register schemas and bounded handlers in one auditable registry."""
+        handlers = {
+            'get_current_detections': (
+                self._tool_current_detections, 'read', 'standard', 2000,
+            ),
+            'get_scene_overview': (
+                self._tool_scene_overview, 'read', 'standard', 2000,
+            ),
+            'get_memory_summary': (
+                self._tool_memory_summary, 'read', 'standard', 2000,
+            ),
+            'look_at_frame': (
+                self._tool_look_at_frame, 'read', 'external', 22000,
+            ),
+            'get_user_preferences': (
+                self._tool_get_user_preferences, 'read', 'user_data', 2000,
+            ),
+            'set_user_preference': (
+                self._tool_set_user_preference, 'write', 'user_data', 2000,
+            ),
+            'get_risk_assessment': (
+                self._tool_risk_assessment, 'read', 'safety_context', 2000,
+            ),
+            'get_navigation_guidance': (
+                self._tool_navigation_guidance,
+                'read',
+                'safety_context',
+                2000,
+            ),
+            'get_environment_trends': (
+                self._tool_environment_trends, 'read', 'standard', 2000,
+            ),
+            'get_system_health': (
+                self._tool_system_health, 'read', 'system', 2000,
+            ),
+            'get_agent_capabilities': (
+                self._tool_agent_capabilities, 'read', 'system', 2000,
+            ),
+            'get_announcement_history': (
+                self._tool_announcement_history, 'read', 'user_data', 2000,
+            ),
+            'get_alert_policy': (
+                self._tool_alert_policy, 'read', 'safety_context', 2000,
+            ),
+        }
+        for definition in AGENT_TOOLS:
+            name = (definition.get('function') or {}).get('name') or ''
+            if name not in handlers:
+                raise ValueError(f"未注册工具处理器: {name}")
+            handler, access, safety_level, timeout_ms = handlers[name]
+            self.tool_registry.register(
+                definition,
+                handler,
+                access=access,
+                safety_level=safety_level,
+                timeout_ms=timeout_ms,
+            )
+
+    def tool_schemas(self) -> List[Dict]:
+        """Return the live registry declarations for OpenAI tool calling."""
+        return self.tool_registry.openai_tools()
+
+    def execute_tool(self, name: str, arguments):
+        """Execute a tool and preserve structured status for the orchestrator."""
+        return self.tool_registry.execute(name, arguments)
+
     def _execute_tool(self, name: str, arguments) -> str:
-        """执行一次工具调用，返回给 LLM 的 JSON 字符串"""
-        try:
-            args = json.loads(arguments) if isinstance(arguments, str) else dict(arguments or {})
-        except (json.JSONDecodeError, TypeError):
-            args = {}
-        try:
-            if name == 'get_current_detections':
-                dets = self._current_detections()
-                fw, _ = self._last_frame_size
-                items = [self._det_item(d, fw) for d in dets]
-                return json.dumps({'detections': items}, ensure_ascii=False)
-            if name == 'get_scene_overview':
-                return json.dumps(self._scene_snapshot(), ensure_ascii=False)
-            if name == 'get_memory_summary':
-                return json.dumps({'memory': self._memory_text()}, ensure_ascii=False)
-            if name == 'look_at_frame':
-                return self._call_vlm(str(args.get('question') or '请描述画面中需要警惕的信息'))
-            if name == 'get_user_preferences':
-                return json.dumps({'preferences': self._preferences()}, ensure_ascii=False)
-            if name == 'set_user_preference':
-                if self.context is not None and hasattr(self.context, 'set_preference'):
-                    res = self.context.set_preference(str(args.get('key') or ''),
-                                                      args.get('value'))
-                else:
-                    res = {'success': False, 'message': '偏好存储当前不可用'}
-                return json.dumps(res, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"工具 {name} 执行失败: {e}")
-            return json.dumps({'error': str(e)}, ensure_ascii=False)
-        return json.dumps({'error': f'未知工具: {name}'}, ensure_ascii=False)
+        """Compatibility wrapper returning the JSON text sent back to the LLM."""
+        result = self.execute_tool(name, arguments)
+        logger.info(
+            "Agent 工具调用: %s(%s) success=%s duration=%sms",
+            name,
+            str(arguments)[:80],
+            result.success,
+            result.duration_ms,
+        )
+        return result.content
+
+    def _tool_current_detections(self, **_) -> Dict:
+        frame_w, _frame_h = self._last_frame_size
+        detections = self._current_detections()
+        return {
+            'detections': [
+                self._det_item(item, frame_w)
+                for item in detections
+            ],
+            'count': len(detections),
+        }
+
+    def _tool_scene_overview(self, **_) -> Dict:
+        return self._scene_snapshot()
+
+    def _tool_memory_summary(self, **_) -> Dict:
+        # _memory_text/_event_text 已自守护；frames 计数在锁内读取
+        with self._state_lock:
+            frames = len(self.memory)
+        return {
+            'memory': self._memory_text(),
+            'frames': frames,
+            'events': self._event_text(limit=8),
+        }
+
+    def _tool_look_at_frame(self, question: str = '', **_) -> Dict:
+        observation = self._call_vlm(
+            str(question or '请描述画面中需要警惕的信息')
+        )
+        return {
+            'observation': self._sanitize_observation(observation),
+            'safety_note': '画面观察仅作辅助，不能作为通行授权',
+        }
+
+    def _tool_get_user_preferences(self, **_) -> Dict:
+        return {'preferences': self._preferences()}
+
+    def _tool_set_user_preference(self, key: str = '', value=None,
+                                  **_) -> Dict:
+        if self.context is not None and hasattr(
+            self.context, 'set_preference'
+        ):
+            return self.context.set_preference(str(key or ''), value)
+        return {'success': False, 'message': '偏好存储当前不可用'}
+
+    def _tool_risk_assessment(self, **_) -> Dict:
+        detections = self._current_detections()
+        overall = self._overall_risk()
+        urgency = assess_announcement(detections, overall)
+        frame_w, _ = self._last_frame_size
+        ranked = sorted(
+            detections,
+            key=lambda item: (
+                RISK_ORDER.get(item.get('risk_level', 'safe'), 4),
+                -float(item.get('confidence', 0) or 0),
+                -float(item.get('area_ratio', 0) or 0),
+            ),
+        )
+        counts = {level: 0 for level in (
+            'critical', 'high', 'medium', 'low', 'safe'
+        )}
+        for item in detections:
+            level = str(item.get('risk_level') or 'safe')
+            counts[level] = counts.get(level, 0) + 1
+        priority = []
+        for item in ranked[:3]:
+            entry = self._det_item(item, frame_w)
+            reasons = []
+            if item.get('trend') == 'approaching':
+                reasons.append('正在接近')
+            if float(item.get('area_ratio', 0) or 0) >= 0.05:
+                reasons.append('距离较近')
+            if item.get('light_state'):
+                reasons.append(
+                    f"灯色{STATE_CN.get(item['light_state'], item['light_state'])}"
+                )
+            entry['reasons'] = reasons or ['当前风险等级较高']
+            priority.append(entry)
+        return {
+            'overall_risk': overall,
+            'urgency_score': urgency.get('score', 0),
+            'urgency': urgency.get('urgency', 'low'),
+            'priority_reasons': urgency.get('reasons', []),
+            'avoidance_priority': priority,
+            'risk_counts': counts,
+            'limitations': (
+                '仅反映已检出目标；未检出、遮挡或模型漏检不等于安全，'
+                '不能据此授权通行。'
+            ),
+        }
+
+    def _tool_environment_trends(self, **_) -> Dict:
+        detections = self._current_detections()
+        approaching = [
+            self._cn(item) for item in detections
+            if item.get('trend') == 'approaching'
+        ]
+        receding = [
+            self._cn(item) for item in detections
+            if item.get('trend') == 'receding'
+        ]
+        # 锁内取事件与记忆快照、锁外统计，避免遍历中被管线线程追加
+        with self._state_lock:
+            events_snapshot = list(self.event_history)
+            memory_frames = len(self.memory)
+        event_counts: Dict[str, int] = {}
+        for event in events_snapshot:
+            key = str(event.get('type') or 'unknown')
+            event_counts[key] = event_counts.get(key, 0) + 1
+        return {
+            'events': events_snapshot[-12:],
+            'event_counts': event_counts,
+            'approaching': approaching,
+            'receding': receding,
+            'memory_frames': memory_frames,
+            'limitations': '事件由逐帧差异聚合，错检和漏检可能导致趋势偏差。',
+        }
+
+    def _tool_navigation_guidance(self, **_) -> Dict:
+        detections = self._current_detections()
+        overall = self._overall_risk()
+        light = safety_policy.traffic_light_state(detections)
+        frame_w, _ = self._last_frame_size
+        ranked = sorted(
+            detections,
+            key=lambda item: (
+                RISK_ORDER.get(item.get('risk_level', 'safe'), 4),
+                -float(item.get('confidence', 0) or 0),
+                -float(item.get('area_ratio', 0) or 0),
+            ),
+        )
+
+        if light in ("red", "yellow", "unknown"):
+            guidance_level = "stop"
+            headline = {
+                "red": "检测到红灯，请停步等待，不要通行",
+                "yellow": "检测到黄灯，请停步等待，不要通行",
+                "unknown": "信号灯状态无法确认，请停步等待",
+            }[light]
+        elif str(overall).lower() in ("critical", "high"):
+            guidance_level = "stop"
+            headline = "检测到高风险目标，请停步并用盲杖确认周围"
+        elif ranked and ranked[0].get("risk_level") == "medium":
+            guidance_level = "caution"
+            headline = "前方存在障碍风险，请减速并用盲杖确认"
+        elif ranked:
+            guidance_level = "monitor"
+            headline = "仅检测到低风险目标，请保持警惕"
+        else:
+            guidance_level = "uncertain"
+            headline = "当前没有检测到目标，不能据此判断环境安全"
+
+        zone_targets = {"左侧": [], "正前方": [], "右侧": []}
+        for item in ranked[:6]:
+            zone = self._zone(self._center_x(item), frame_w)
+            zone_targets.setdefault(zone, []).append(self._cn(item))
+
+        actions = ["保持盲杖触地探索，不因单次检测结果加快脚步"]
+        if guidance_level == "stop":
+            actions.insert(0, "停在当前位置，等待风险变化或人工协助")
+        elif guidance_level == "caution":
+            actions.insert(0, "降低速度，并优先让开正前方障碍")
+        else:
+            actions.insert(0, "继续观察，并关注左右两侧和目标运动趋势")
+        if light == "green":
+            actions.append("绿灯只表示检测到绿色区域，仍需人工确认路口")
+
+        return {
+            "guidance_level": guidance_level,
+            "headline": headline,
+            "actions": actions[:4],
+            "zone_targets": {
+                key: values for key, values in zone_targets.items() if values
+            },
+            "priority_targets": [
+                self._det_item(item, frame_w) for item in ranked[:3]
+            ],
+            "safety_note": (
+                "该建议只用于避障和风险提示，不包含过街或通行授权；"
+                "漏检、遮挡和未检测区域不能视为安全。"
+            ),
+        }
+
+    def _tool_system_health(self, **_) -> Dict:
+        return self.status()
+
+    def _tool_agent_capabilities(self, **_) -> Dict:
+        return {
+            'architecture': {
+                'version': self.agent_version,
+                'style': 'orchestrated-specialists-with-safety-guard',
+                'max_tool_rounds': self.max_tool_rounds,
+                'max_model_tool_calls': self.max_model_tool_calls,
+                'max_specialist_roles': self.max_specialist_roles,
+                'tool_prefetch_enabled': self.tool_prefetch_enabled,
+                'specialist_execution_enabled': (
+                    self.specialist_execution_enabled
+                ),
+            },
+            'roles': [
+                {
+                    'key': role.key,
+                    'name': role.name,
+                    'description': role.description,
+                    'authority': role.authority,
+                    'preferred_tools': list(role.preferred_tools),
+                }
+                for role in SPECIALISTS
+            ],
+            'tools': self.tool_registry.capabilities(),
+            'safety_rules': [
+                '红灯、黄灯、未知灯色、高风险或无检测时，通行问题绕过 LLM',
+                '绿灯不构成通行许可，只描述观测并要求人工确认',
+                '主动播报和对话回复均经过确定性危险措辞拦截',
+                '用户偏好只允许白名单键和范围校验后的写入',
+            ],
+        }
+
+    def _tool_announcement_history(self, **_) -> Dict:
+        with self._state_lock:
+            announcements = list(self.announcement_history)
+        return {
+            'announcements': announcements[-8:],
+            'count': len(announcements),
+        }
+
+    def _tool_alert_policy(self, **_) -> Dict:
+        detections = self._current_detections()
+        risk_level = self._overall_risk()
+        candidates = self.should_announce(detections)
+        urgency = assess_announcement(detections, risk_level)
+        suppressed = len(detections) - len(candidates)
+
+        if not detections:
+            decision = 'silent'
+            reasons = ['当前没有检测到目标']
+        elif not candidates:
+            decision = 'silent'
+            reasons = [
+                f"没有目标达到 min_level={self.min_level} 和 "
+                f"min_confidence={self.min_confidence} 的播报门槛"
+            ]
+        else:
+            decision = 'announce'
+            reasons = list(urgency.get('reasons') or [])
+
+        return {
+            'decision': decision,
+            'urgency': urgency.get('urgency', 'low'),
+            'score': urgency.get('score', 0),
+            'reasons': reasons,
+            'announce_candidates': len(candidates),
+            'suppressed_targets': max(0, suppressed),
+            'min_level': self.min_level,
+            'min_confidence': self.min_confidence,
+            'cooldown_s': self.announce_cooldown,
+            'last_announcement': self.last_announce_text,
+            'safety_note': '静默只表示未达到主动播报门槛，不代表环境安全。',
+        }
 
     def _det_item(self, d: Dict, frame_w: int) -> Dict:
         zone = self._zone(self._center_x(d), frame_w)
@@ -570,6 +1106,16 @@ class BlindGuardAgent:
             logger.error(f"VLM 调用失败: {e}")
         return '（视觉模型调用失败，请稍后再试）'
 
+    def _sanitize_observation(self, observation: str) -> str:
+        """Prevent visual observations from becoming an implicit crossing grant."""
+        sanitized = safety_policy.enforce_announcement_safety(
+            self._clean(observation or ''),
+            self._current_detections(),
+        )
+        if sanitized:
+            return sanitized
+        return '视觉模型给出了可能被理解为通行授权的表述，系统已拦截。'
+
     # ==================== LLM 调用（OpenAI 兼容） ====================
 
     def _call_llm(self, messages: List[Dict], max_tokens: int = 120,
@@ -612,6 +1158,8 @@ class BlindGuardAgent:
                     body = json.loads(r.read().decode('utf-8'))
                 msg = body['choices'][0]['message'] or {}
                 self._fail_count = 0  # 调用成功，重置熔断计数
+                self._llm_degraded = False
+                self._last_error = ''
                 return msg if isinstance(msg, dict) else {'content': str(msg)}
             except urllib.error.HTTPError as e:
                 detail = ''
@@ -620,6 +1168,7 @@ class BlindGuardAgent:
                 except Exception:
                     pass
                 logger.error(f"LLM HTTP 错误 {e.code}: {detail}")
+                error = f"HTTP {e.code}: {detail[:200]}"
                 # 端点不支持 tools 时自动降级为纯上下文模式，重试一次
                 if use_tools and e.code in (400, 404, 422):
                     logger.warning("端点似乎不支持 tools，降级为纯上下文模式")
@@ -629,13 +1178,16 @@ class BlindGuardAgent:
                 break
             except Exception as e:
                 logger.error(f"LLM 调用失败: {e}")
+                error = f"{type(e).__name__}: {e}"
                 break
-        self._register_failure()
+        self._register_failure(error)
         return {'content': ''}
 
-    def _register_failure(self):
+    def _register_failure(self, error: str):
         """记录一次调用失败，连续失败达到阈值则触发熔断"""
         self._fail_count += 1
+        self._llm_degraded = True
+        self._last_error = error
         if self._fail_count >= self.FAIL_TRIP_THRESHOLD:
             self._fail_skip_until = time.time() + self.FAIL_SKIP_SECONDS
             logger.warning(
@@ -645,13 +1197,24 @@ class BlindGuardAgent:
 
     @staticmethod
     def _clean(text: str) -> str:
-        """清理 LLM 输出的多余引号和空白"""
+        """清理 LLM 输出的多余引号和空白（仅剥离首尾成对的引号）"""
         if not text:
             return ''
         text = text.strip()
-        for q in ('"""', "'''", '"', "'", '「', '」'):
-            text = text.strip().strip(q)
-        return text.strip()
+        # 仅当同一引号在首尾“成对”出现时剥离，避免误删正文中合法的单侧
+        # 引号（例如「警告」引用的开/闭引号只被剥掉一半）。
+        # (开头, 结尾) 对：while 循环逐层剥除，支持三引号等多层包裹。
+        wrappers = ('"', "'", '「」')
+        changed = True
+        while changed and len(text) >= 2:
+            changed = False
+            for pair in wrappers:
+                open_q, close_q = pair[0], pair[-1]
+                if text.startswith(open_q) and text.endswith(close_q):
+                    text = text[1:-1].strip()
+                    changed = True
+                    break
+        return text
 
     # ==================== 小工具 ====================
 
@@ -704,18 +1267,69 @@ class BlindGuardAgent:
 
     # ==================== 状态 ====================
 
+    def llm_available(self) -> bool:
+        """当前是否健康可用；已配置但调用失败时返回 False。"""
+        return bool(self.llm_ok and not self._llm_degraded)
+
     def status(self) -> Dict:
+        orchestration = self.orchestrator.snapshot()
+        # 各共享结构计数在锁内一次性读取，避免与并发追加/清空交错
+        with self._state_lock:
+            memory_frames = len(self.memory)
+            event_count = len(self.event_history)
+            announcement_count = len(self.announcement_history)
+            chat_turns = len(self.chat_history) // 2
         return {
+            'agent_version': self.agent_version,
             'enabled': self.enabled,
-            'llm_active': self.llm_ok,
-            'model': self.model if self.llm_ok else '本地回退',
+            'llm_configured': self.llm_ok,
+            'llm_active': self.llm_available(),
+            'fallback_active': bool(self.enabled and not self.llm_available()),
+            'last_error': self._last_error,
+            'model': self.model if self.llm_available() else '本地回退',
             'tools_supported': self.tools_supported,
-            'tool_count': len(AGENT_TOOLS),
+            'architecture': orchestration['architecture'],
+            'orchestrator_version': orchestration['version'],
+            'role_count': len(orchestration['roles']),
+            'roles': [role['key'] for role in orchestration['roles']],
+            'role_catalog': orchestration['roles'],
+            'tool_count': len(self.tool_registry.names),
+            'tool_names': self.tool_registry.names,
+            'tool_prefetch_enabled': self.tool_prefetch_enabled,
+            'specialist_execution_enabled': (
+                self.specialist_execution_enabled
+            ),
+            'max_specialist_roles': self.max_specialist_roles,
+            'max_model_tool_calls': self.max_model_tool_calls,
             'vision_active': self.vlm_ok,
             'vision_model': self.vision_model if self.vlm_ok else '',
-            'memory_frames': len(self.memory),
-            'chat_turns': len(self.chat_history) // 2,
+            'memory_frames': memory_frames,
+            'event_count': event_count,
+            'announcement_count': announcement_count,
+            'chat_turns': chat_turns,
+            'last_plan': orchestration['last_plan'],
+            'last_run': orchestration['last_run'],
+            'recent_tool_calls': orchestration['recent_tool_calls'],
         }
+
+    def reset(self):
+        """Clear per-run state while preserving configuration and context."""
+        # 四个共享结构的清空须与并发读/写互斥
+        with self._state_lock:
+            self.memory.clear()
+            self.event_history.clear()
+            self.announcement_history.clear()
+            self.chat_history.clear()
+        self._last_detections = []
+        self._last_risk = 'safe'
+        self._last_frame_size = (640, 480)
+        self._last_scene = {}
+        self.last_announce_time = 0.0
+        self.last_announce_text = ''
+        self._fail_count = 0
+        self._fail_skip_until = 0.0
+        self.tool_registry.clear_audit()
+        self.orchestrator.reset()
 
 
 def load_agent_config(config_path: str = 'config.yaml') -> Dict:

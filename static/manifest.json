@@ -4,8 +4,8 @@
     "description": "主动式多模态导盲感知智能体：实时检测、风险评估、语音问答",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#1a1a2e",
-    "theme_color": "#1a1a2e",
+    "background_color": "#f2f2f7",
+    "theme_color": "#f2f2f7",
     "lang": "zh-CN",
     "icons": [
         {"src": "/icon_192.png", "sizes": "192x192", "type": "image/png"},

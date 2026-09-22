@@ -1,0 +1,369 @@
+{
+  "endpoint": {
+    "base_url": "https://api.deepseek.com/v1",
+    "model": "deepseek-chat",
+    "api_key_present": true
+  },
+  "checks": [
+    {
+      "name": "endpoint_configured",
+      "passed": true,
+      "detail": {
+        "base_url": "https://api.deepseek.com/v1",
+        "model": "deepseek-chat",
+        "api_key_present": true
+      }
+    },
+    {
+      "name": "chat_completion",
+      "passed": false,
+      "detail": {
+        "latency_ms": 12145,
+        "content": "",
+        "error": "HTTP 402: {\"error\":{\"message\":\"Insufficient Balance\",\"type\":\"unknown_error\",\"param\":null,\"code\":\"invalid_request_error\"}}",
+        "tools_supported": true
+      }
+    },
+    {
+      "name": "orchestrated_architecture",
+      "passed": true,
+      "detail": {
+        "architecture": "orchestrated-specialists-with-safety-guard",
+        "role_count": 10,
+        "tool_count": 13,
+        "tool_prefetch_enabled": true,
+        "specialist_execution_enabled": true,
+        "max_model_tool_calls": 6,
+        "missing_roles": [],
+        "missing_tools": []
+      }
+    },
+    {
+      "name": "navigation_guidance_safety",
+      "passed": true,
+      "detail": {
+        "guidance_level": "stop",
+        "headline": "检测到高风险目标，请停步并用盲杖确认周围",
+        "safety_note": "该建议只用于避障和风险提示，不包含过街或通行授权；漏检、遮挡和未检测区域不能视为安全。"
+      }
+    },
+    {
+      "name": "alert_policy_explainability",
+      "passed": true,
+      "detail": {
+        "decision": "announce",
+        "score": 59,
+        "reasons": [
+          "存在高危目标",
+          "目标正在接近"
+        ],
+        "safety_note": "静默只表示未达到主动播报门槛，不代表环境安全。"
+      }
+    },
+    {
+      "name": "tool_loop_trace_accuracy",
+      "passed": true,
+      "detail": {
+        "path": "llm_tool_loop",
+        "phases": [
+          "prefetch",
+          "prefetch",
+          "specialist",
+          "model"
+        ],
+        "model_calls": [
+          "get_current_detections"
+        ],
+        "stages": [
+          {
+            "stage": "routing",
+            "status": "completed",
+            "intent": "environment",
+            "lead_role": "perception"
+          },
+          {
+            "stage": "prefetch",
+            "status": "completed",
+            "tool_count": 2
+          },
+          {
+            "stage": "specialists",
+            "status": "completed",
+            "role_count": 5,
+            "tool_count": 1
+          },
+          {
+            "stage": "llm",
+            "status": "completed",
+            "path": "llm_tool_loop"
+          },
+          {
+            "stage": "tool_loop",
+            "status": "completed",
+            "tool_count": 1,
+            "denied_count": 0
+          },
+          {
+            "stage": "safety_review",
+            "status": "completed",
+            "rewritten": false,
+            "passed": true
+          }
+        ],
+        "reply": "汽车正在正前方接近，请停步观察。"
+      }
+    },
+    {
+      "name": "specialist_team_evidence",
+      "passed": true,
+      "detail": {
+        "roles": [
+          "perception",
+          "risk_analyst",
+          "navigation_advisor",
+          "communicator",
+          "safety_guard"
+        ],
+        "contributions": [
+          {
+            "role": "perception",
+            "name": "实时感知员",
+            "status": "completed",
+            "source": "prefetched",
+            "tool": "get_current_detections",
+            "success": true,
+            "summary": "检测到 1 个目标：汽车；正在接近：汽车",
+            "authority": "只描述观测，不推断未检测到的安全"
+          },
+          {
+            "role": "risk_analyst",
+            "name": "风险分析员",
+            "status": "completed",
+            "source": "prefetched",
+            "tool": "get_risk_assessment",
+            "success": true,
+            "summary": "整体风险 high；优先目标 汽车（正在接近）",
+            "authority": "只提供风险建议，不作通行授权"
+          },
+          {
+            "role": "navigation_advisor",
+            "name": "无障碍导航员",
+            "status": "completed",
+            "source": "specialist",
+            "tool": "get_navigation_guidance",
+            "success": true,
+            "summary": "检测到高风险目标，请停步并用盲杖确认周围；停在当前位置，等待风险变化或人工协助；保持盲杖触地探索，不因单次检测结果加快脚步",
+            "authority": "只提供避障建议，不提供过街或通行授权"
+          },
+          {
+            "role": "communicator",
+            "name": "沟通生成器",
+            "status": "completed",
+            "source": "orchestrator",
+            "tool": null,
+            "success": true,
+            "summary": "已生成候选回复并交给安全守门员复核",
+            "authority": "最终内容仍须经过安全守门员复核"
+          },
+          {
+            "role": "safety_guard",
+            "name": "安全守门员",
+            "status": "completed",
+            "source": "deterministic_review",
+            "tool": null,
+            "success": true,
+            "summary": "最终回复通过确定性安全复核",
+            "authority": "最高优先级；可覆盖 LLM 输出，但不得授权通行"
+          }
+        ],
+        "specialist_stage": {
+          "stage": "specialists",
+          "status": "completed",
+          "role_count": 5,
+          "tool_count": 1
+        }
+      }
+    },
+    {
+      "name": "model_tool_policy",
+      "passed": true,
+      "detail": {
+        "denied": true,
+        "error": "写工具只能用于明确的用户偏好调整意图，本轮意图不允许模型直接修改用户设置",
+        "voice_rate": 180
+      }
+    },
+    {
+      "name": "safety_review_audit",
+      "passed": true,
+      "detail": {
+        "raw_reply": "检测到绿灯，可以安全通行。",
+        "sanitized_reply": "当前检测到高风险目标，请停步等待。系统不能确认可以通行。",
+        "safety_review": {
+          "passage_intent": true,
+          "raw_reply_dangerous": true,
+          "guard_triggered": true,
+          "safety_rewritten": true,
+          "final_reply_dangerous": false,
+          "idempotent": true,
+          "guard_passed": true
+        }
+      }
+    }
+  ],
+  "agent_status": {
+    "agent_version": "2.5.0",
+    "enabled": true,
+    "llm_configured": true,
+    "llm_active": false,
+    "fallback_active": true,
+    "last_error": "HTTP 402: {\"error\":{\"message\":\"Insufficient Balance\",\"type\":\"unknown_error\",\"param\":null,\"code\":\"invalid_request_error\"}}",
+    "model": "本地回退",
+    "tools_supported": true,
+    "architecture": "orchestrated-specialists-with-safety-guard",
+    "orchestrator_version": "1.1",
+    "role_count": 10,
+    "roles": [
+      "safety_guard",
+      "perception",
+      "risk_analyst",
+      "navigation_advisor",
+      "temporal_memory",
+      "visual_observer",
+      "preference",
+      "communicator",
+      "alert_manager",
+      "self_monitor"
+    ],
+    "role_catalog": [
+      {
+        "key": "safety_guard",
+        "name": "安全守门员",
+        "description": "红灯、高风险、未知灯色和通行意图的确定性拦截与复核",
+        "authority": "最高优先级；可覆盖 LLM 输出，但不得授权通行",
+        "preferred_tools": [
+          "get_risk_assessment",
+          "get_navigation_guidance",
+          "get_alert_policy"
+        ]
+      },
+      {
+        "key": "perception",
+        "name": "实时感知员",
+        "description": "读取当前目标、方位、置信度、跟踪趋势和红绿灯状态",
+        "authority": "只描述观测，不推断未检测到的安全",
+        "preferred_tools": [
+          "get_current_detections",
+          "get_scene_overview"
+        ]
+      },
+      {
+        "key": "risk_analyst",
+        "name": "风险分析员",
+        "description": "输出风险排序、风险原因和优先避让对象",
+        "authority": "只提供风险建议，不作通行授权",
+        "preferred_tools": [
+          "get_risk_assessment",
+          "get_environment_trends"
+        ]
+      },
+      {
+        "key": "navigation_advisor",
+        "name": "无障碍导航员",
+        "description": "把障碍方位和风险转换成停步、减速、盲杖确认等非通行建议",
+        "authority": "只提供避障建议，不提供过街或通行授权",
+        "preferred_tools": [
+          "get_navigation_guidance",
+          "get_current_detections"
+        ]
+      },
+      {
+        "key": "temporal_memory",
+        "name": "时序记忆员",
+        "description": "聚合目标出现、消失、接近、远离和灯色变化事件",
+        "authority": "记忆不完整时必须明确说明",
+        "preferred_tools": [
+          "get_memory_summary",
+          "get_environment_trends",
+          "get_announcement_history"
+        ]
+      },
+      {
+        "key": "visual_observer",
+        "name": "视觉观察员",
+        "description": "按需调用 VLM 查看文字、标志和检测框外的画面细节",
+        "authority": "观察结果仅作辅助信息",
+        "preferred_tools": [
+          "look_at_frame",
+          "get_scene_overview"
+        ]
+      },
+      {
+        "key": "preference",
+        "name": "偏好管家",
+        "description": "读取和调整语速、播报详略等白名单用户偏好",
+        "authority": "仅允许白名单键和范围校验后的写入",
+        "preferred_tools": [
+          "get_user_preferences",
+          "set_user_preference"
+        ]
+      },
+      {
+        "key": "communicator",
+        "name": "沟通生成器",
+        "description": "将工具结果压缩成简短、自然的中文语音或对话回复",
+        "authority": "最终内容仍须经过安全守门员复核",
+        "preferred_tools": []
+      },
+      {
+        "key": "alert_manager",
+        "name": "播报策略员",
+        "description": "根据风险等级、置信度、紧急度、冷却时间和历史记录决定是否主动播报",
+        "authority": "保持保守沉默；静默不得解释为环境安全",
+        "preferred_tools": [
+          "get_alert_policy",
+          "get_announcement_history"
+        ]
+      },
+      {
+        "key": "self_monitor",
+        "name": "运行监控员",
+        "description": "报告模型、工具、视觉、降级和最近工具轨迹",
+        "authority": "只报告状态，不把系统健康解释为道路安全",
+        "preferred_tools": [
+          "get_system_health",
+          "get_agent_capabilities"
+        ]
+      }
+    ],
+    "tool_count": 13,
+    "tool_names": [
+      "get_current_detections",
+      "get_scene_overview",
+      "get_memory_summary",
+      "look_at_frame",
+      "get_user_preferences",
+      "set_user_preference",
+      "get_risk_assessment",
+      "get_navigation_guidance",
+      "get_environment_trends",
+      "get_system_health",
+      "get_agent_capabilities",
+      "get_announcement_history",
+      "get_alert_policy"
+    ],
+    "tool_prefetch_enabled": true,
+    "specialist_execution_enabled": true,
+    "max_specialist_roles": 3,
+    "max_model_tool_calls": 6,
+    "vision_active": false,
+    "vision_model": "",
+    "memory_frames": 0,
+    "event_count": 0,
+    "announcement_count": 0,
+    "chat_turns": 0,
+    "last_plan": {},
+    "last_run": {},
+    "recent_tool_calls": []
+  }
+}

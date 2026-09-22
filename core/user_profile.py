@@ -70,6 +70,8 @@ class UserProfile:
         key = str(key or '').strip()
         if not key:
             return False, '偏好项名称不能为空'
+        if key not in self.LIMITS and key not in self.ENUMS:
+            return False, f"不支持的偏好项: {key}"
 
         try:
             if key in self.LIMITS:

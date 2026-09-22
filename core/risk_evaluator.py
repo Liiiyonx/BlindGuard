@@ -104,6 +104,14 @@ class RiskEvaluator:
         """
         self._class_mapping = dict(class_mapping) if class_mapping else {}
 
+        # 实例级阈值副本（关键：避免污染类属性）
+        # CLASS_RISK_SCORES / DISTANCE_THRESHOLDS 是类属性，若直接 update
+        # 会改动类本身，污染所有现存及未来实例（一处自定义阈值，全局生效）。
+        # 这里先浅拷贝为实例属性（遮蔽同名类属性），后续自定义只改实例副本；
+        # 值均为不可变标量，浅拷贝足够。默认实例（无自定义阈值）行为完全不变。
+        self.CLASS_RISK_SCORES = dict(type(self).CLASS_RISK_SCORES)
+        self.DISTANCE_THRESHOLDS = dict(type(self).DISTANCE_THRESHOLDS)
+
         # 应用自定义阈值
         if risk_thresholds:
             self._apply_custom_thresholds(risk_thresholds)
@@ -138,7 +146,11 @@ class RiskEvaluator:
         logger.info(f"中风险类别: {self._medium_risk_classes}")
 
     def _apply_custom_thresholds(self, thresholds: Dict):
-        """应用自定义阈值配置"""
+        """应用自定义阈值配置
+
+        只更新本实例的阈值副本（__init__ 中已从类属性浅拷贝），
+        不会改动类属性，因此不会影响其它现存或未来实例。
+        """
         # 更新类别风险分值
         if 'class_scores' in thresholds:
             self.CLASS_RISK_SCORES.update(thresholds['class_scores'])
@@ -235,7 +247,8 @@ class RiskEvaluator:
             'area_ratio': area_ratio
         }
         # 透传跟踪器/红绿灯的附加信息
-        for key in ('light_state', 'track_id', 'track_age', 'trend', 'conf_smooth'):
+        for key in ('light_state', 'track_id', 'track_age', 'trend',
+                    'conf_stable', 'conf_smooth'):
             if key in detection:
                 result[key] = detection[key]
         return result
@@ -370,9 +383,9 @@ class RiskEvaluator:
 
         # 红灯：给出通行约束而非障碍警告
         if light_state == 'red':
-            return "红灯，请等待绿灯再通行"
+            return "红灯，请等待，不要通行"
         if light_state == 'green':
-            return "绿灯，注意观察后可通行"
+            return "绿灯，请自行确认路况，不能据此判断可通行"
 
         # 根据风险等级生成不同紧急程度的警告
         if risk_level == RiskLevel.CRITICAL:

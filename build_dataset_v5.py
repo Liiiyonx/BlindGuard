@@ -79,8 +79,11 @@ def main():
                 continue
             x, y, bw, bh = bb
             lines.append(f"{BDD_MAP[label]} {x+bw/2:.6f} {y+bh/2:.6f} {bw:.6f} {bh:.6f}")
-            if label == 'traffic light' and det.get('trafficLightColor') in 'RYG':
-                lights.append({'color': det['trafficLightColor'],
+            light_color = det.get('trafficLightColor')
+            if isinstance(light_color, str):
+                light_color = light_color.strip().upper()
+            if label == 'traffic light' and light_color in ('R', 'Y', 'G'):
+                lights.append({'color': light_color,
                                'bbox': [x, y, bw, bh]})
         if not lines:
             continue

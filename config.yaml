@@ -1,5 +1,5 @@
 # ============================================
-# BlindGuard 智能导盲系统 V1.0 - 配置文件
+# BlindGuard 智能导盲系统 V2.5.0 - 配置文件
 # ============================================
 
 # 摄像头配置
@@ -13,8 +13,8 @@ camera:
 detector:
   # 主模型：通用交通类（s 系 = yolov10s 容量升级 + BDD 路域数据，BDD 路域 mAP50 55.7）
   model_path: "best_s.pt"
-  confidence: 0.5           # 置信度阈值（v3 阈值扫描：0.5 时精确率 91.5%/召回 41.0%，
-                            # 0.6 为 94%/35.6%——导盲场景漏检比误报更危险，取 0.5 平衡点）
+  confidence: 0.5           # 检测层偏召回（v3 扫描：0.5 时召回 41.0%，0.6 时 35.6%）；
+                            # 播报层再由 agent.announce 做保守过滤，两层职责不同
   iou_threshold: 0.45       # IoU 阈值（可调）
   device: ""                # 推理设备：""=自动(有GPU用GPU), "cpu", "cuda:0"
   img_size: 960             # 主模型推理尺寸（960 提升远处小目标红绿灯召回，速度约 18FPS）
@@ -120,9 +120,20 @@ agent:
     cooldown: 3.0           # 播报冷却（秒），避免每帧都调 LLM
     memory_size: 8          # 时序记忆滑动窗口帧数
     min_level: "medium"     # 主动播报最低风险等级：low/safe 目标只可查询不主动播报（分级告警）
-    min_confidence: 0.45    # 低于该置信度的目标不主动播报（宁可漏报不误报）
+    min_confidence: 0.45    # 低于该置信度的目标不主动播报（播报层保守沉默）
   chat:
     max_history: 6          # 对话保留的历史轮数
+  architecture:             # 编排式多能力 Agent：安全守门员 + 专业能力 + 工具注册表
+    version: "2.5.0"
+    max_tool_rounds: 3      # 单轮对话最多允许的“LLM 请求工具”轮数
+    max_model_tool_calls: 6 # 单轮对话模型可发起的工具调用总上限
+    tool_trace_size: 80     # 保留的最近工具轨迹条数
+    event_history_size: 40  # 目标出现/消失/接近/远离/灯色变化事件上限
+    announcement_history_size: 20  # 主动播报历史上限
+    enable_intent_planner: true     # 本地意图路由；关闭后仍保留安全护栏
+    enable_tool_prefetch: true      # LLM 调用前预取有界本地只读工具，降低幻觉
+    enable_specialist_team: true    # 主责/协作角色基于工具证据产出结构化结论
+    max_specialist_roles: 3         # 每轮最多执行的主责与协作角色数量
 
 # 日志配置
 logger:
@@ -132,9 +143,11 @@ logger:
 
 # Flask 服务器配置
 server:
-  host: "0.0.0.0"           # 监听地址
+  host: "127.0.0.1"         # 默认仅本机访问；远程监听必须同时配置 token
   port: 5000                # 监听端口
   debug: false              # 调试模式
+  auth_token: ""            # 留空；远程部署时用 BLINDGUARD_SERVER_TOKEN 设置
+  max_upload_mb: 200        # 上传视频大小上限（MB），超限拒绝并返回 JSON 错误
 
 # 英文类别 -> 中文类别映射
 class_mapping:

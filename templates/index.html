@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#1a1a2e">
+    <meta name="theme-color" content="#f2f2f7">
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" href="/icon_192.png">
     <link rel="apple-touch-icon" href="/icon_192.png">
     <title>BlindGuard 智能导盲系统</title>
     <style>
@@ -69,22 +70,40 @@
         }
         .progress-bar {
             flex: 1;
+            min-height: 24px;
+            background: transparent;
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            align-items: center;
+            outline: none;
+            touch-action: manipulation;
+        }
+        .progress-bar::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
             height: 6px;
             background: rgba(255,255,255,0.2);
             border-radius: 3px;
-            cursor: pointer;
-            position: relative;
         }
         .progress-fill {
-            height: 100%;
+            position: relative;
+            z-index: 1;
+            height: 6px;
             background: linear-gradient(90deg, #667eea, #764ba2);
             border-radius: 3px;
             width: 0%;
             transition: width 0.1s;
         }
-        .progress-bar:hover .progress-fill {
+        .progress-bar:hover .progress-fill,
+        .progress-bar:focus-visible .progress-fill {
             height: 8px;
-            margin-top: -1px;
+        }
+        .progress-bar:focus-visible {
+            outline: 2px solid #fff;
+            outline-offset: 2px;
         }
         .time-display {
             font-size: 12px;
@@ -188,6 +207,11 @@
             cursor: pointer;
         }
         .upload-area:hover { border-color: #667eea; }
+        .upload-area:focus-visible {
+            border-color: #fff;
+            outline: 2px solid #667eea;
+            outline-offset: 2px;
+        }
         .upload-area input { display: none; }
         /* 智能对话面板 */
         .agent-badge {
@@ -199,6 +223,12 @@
         }
         .agent-badge.on { background: rgba(56,239,125,0.2); color: #38ef7d; }
         .agent-badge.off { background: rgba(244,92,67,0.2); color: #f45c43; }
+        .safety-note {
+            color: #ffd166;
+            font-size: 12px;
+            line-height: 1.45;
+            margin: -7px 0 10px;
+        }
         .chat-box {
             background: rgba(0,0,0,0.3);
             border-radius: 10px;
@@ -309,6 +339,7 @@
         body.hc .timeline-item { color: #ffe600; }
         body.hc .chip { color: #ffe600; border-color: #ffe600; }
         body.hc h1, body.hc h3 { color: #ffe600; }
+        body.hc .video-placeholder, body.hc .video-placeholder small { color: #ffe600; }
         @media (max-width: 900px) {
             .main-container { flex-direction: column; }
             .control-panel { width: 100%; }
@@ -318,11 +349,1071 @@
             .main-container { padding: 10px; gap: 12px; }
             .panel-card { padding: 14px; }
             .btn { padding: 12px 14px; font-size: 15px; }
-            .chip { padding: 8px 12px; font-size: 13px; }
+            .chip {
+                min-height: 44px;
+                padding: 10px 14px;
+                font-size: 13px;
+            }
             .chat-box { max-height: 150px; }
             .detection-list { max-height: 220px; }
-            .tool-btn { padding: 6px 10px; font-size: 12px; }
+            .tool-btn {
+                min-height: 44px;
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+            .progress-bar { min-height: 44px; }
+            .chat-input-row input,
+            .chat-input-row button { min-height: 44px; }
             .mic-btn { font-size: 14px; }
+        }
+
+        /* iOS 浅色分组风格 */
+        :root {
+            --ios-bg: #f2f2f7;
+            --ios-card: #ffffff;
+            --ios-fill: #f2f2f7;
+            --ios-label: #1c1c1e;
+            --ios-secondary: #6c6c70;
+            --ios-tertiary: #8e8e93;
+            --ios-separator: rgba(60, 60, 67, 0.14);
+            --ios-blue: #007aff;
+            --ios-green: #34c759;
+            --ios-red: #ff3b30;
+            --ios-orange: #ff9500;
+            --ios-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+            color-scheme: light;
+        }
+
+        html {
+            background: var(--ios-bg);
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            min-height: 100vh;
+            min-height: 100dvh;
+            background: var(--ios-bg);
+            color: var(--ios-label);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            line-height: 1.45;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            padding: calc(12px + env(safe-area-inset-top))
+                max(20px, calc((100vw - 1400px) / 2)) 12px;
+            background: rgba(242, 242, 247, 0.88);
+            border-bottom: 1px solid var(--ios-separator);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            backdrop-filter: saturate(180%) blur(20px);
+        }
+
+        .logo h1 {
+            color: var(--ios-label);
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0;
+            line-height: 1.2;
+        }
+
+        .logo p {
+            margin-top: 3px;
+            color: var(--ios-secondary);
+            font-size: 12px;
+            opacity: 1;
+        }
+
+        .main-container {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .video-section {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            background: var(--ios-card);
+            border: 1px solid var(--ios-separator);
+            border-radius: 8px;
+            box-shadow: var(--ios-shadow);
+        }
+
+        .video-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--ios-card);
+            border-bottom: 1px solid var(--ios-separator);
+        }
+
+        .video-header h3,
+        .panel-card h3 {
+            color: var(--ios-label);
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: 0;
+        }
+
+        .video-header h3 {
+            margin: 0;
+        }
+
+        .video-container {
+            aspect-ratio: 16 / 9;
+            max-height: 520px;
+            background: #000;
+        }
+
+        .video-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 20px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.78);
+            background: #000;
+            pointer-events: none;
+        }
+
+        .video-placeholder p { margin: 0; font-size: 15px; font-weight: 600; }
+
+        .video-placeholder small { color: rgba(255, 255, 255, 0.45); font-size: 12px; line-height: 1.5; }
+
+        .video-controls {
+            display: grid;
+            grid-template-columns: auto minmax(140px, 1fr) auto auto;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            color: var(--ios-secondary);
+            background: var(--ios-card);
+            border-top: 1px solid var(--ios-separator);
+        }
+
+        .video-controls .btn-group {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(48px, 1fr));
+            gap: 6px;
+            min-width: 228px;
+            margin: 0;
+        }
+
+        .control-btn,
+        .speed-btn {
+            min-height: 40px;
+            border: 0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .control-btn {
+            min-width: 56px;
+            padding: 0 14px;
+            color: #fff;
+            background: var(--ios-blue);
+        }
+
+        .control-btn:hover {
+            background: #006edc;
+        }
+
+        .speed-btn {
+            padding: 0 10px;
+            color: var(--ios-label);
+            background: var(--ios-fill);
+        }
+
+        .speed-btn:hover {
+            background: #e5e5ea;
+        }
+
+        .speed-btn.active {
+            color: #fff;
+            background: var(--ios-blue);
+        }
+
+        .speed-btn.active:hover {
+            background: #006edc;
+        }
+
+        .progress-bar {
+            min-height: 40px;
+        }
+
+        .progress-bar::before {
+            height: 6px;
+            background: #d1d1d6;
+            border-radius: 3px;
+        }
+
+        .progress-fill {
+            height: 6px;
+            background: var(--ios-blue);
+            border-radius: 3px;
+        }
+
+        .progress-bar:hover .progress-fill,
+        .progress-bar:focus-visible .progress-fill {
+            height: 8px;
+        }
+
+        .time-display {
+            min-width: 92px;
+            color: var(--ios-secondary);
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .control-panel {
+            width: 360px;
+            gap: 16px;
+        }
+
+        .panel-card {
+            padding: 18px;
+            background: var(--ios-card);
+            border: 1px solid var(--ios-separator);
+            border-radius: 8px;
+            box-shadow: var(--ios-shadow);
+        }
+
+        .panel-card h3 {
+            margin-bottom: 14px;
+        }
+
+        .btn-group {
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .btn {
+            min-width: 0;
+            min-height: 44px;
+            padding: 11px 14px;
+            border: 0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0;
+            transition: background-color 0.16s ease, opacity 0.16s ease,
+                transform 0.16s ease;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background: var(--ios-blue);
+        }
+
+        .btn-success {
+            color: #fff;
+            background: var(--ios-green);
+        }
+
+        .btn-danger {
+            color: #fff;
+            background: var(--ios-red);
+        }
+
+        .btn-secondary {
+            color: var(--ios-blue);
+            background: #e5e5ea;
+        }
+
+        .btn:disabled,
+        .tool-btn:disabled,
+        .speed-btn:disabled,
+        .control-btn:disabled {
+            opacity: 0.46;
+            cursor: not-allowed;
+        }
+
+        .btn:not(:disabled):active,
+        .tool-btn:not(:disabled):active,
+        .speed-btn:not(:disabled):active,
+        .control-btn:not(:disabled):active,
+        .chip:active {
+            transform: scale(0.98);
+        }
+
+        .tool-btn {
+            min-height: 36px;
+            padding: 8px 13px;
+            color: var(--ios-blue);
+            background: rgba(118, 118, 128, 0.12);
+            border: 0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .tool-btn:hover {
+            background: rgba(118, 118, 128, 0.18);
+        }
+
+        .status-grid {
+            gap: 8px;
+        }
+
+        .status-item,
+        .risk-indicator,
+        .message-area,
+        .chat-box,
+        .detection-item,
+        .timeline-item {
+            background: var(--ios-fill);
+            border-radius: 8px;
+        }
+
+        .status-item {
+            padding: 14px 12px;
+        }
+
+        .status-label {
+            color: var(--ios-secondary);
+            font-size: 12px;
+            opacity: 1;
+        }
+
+        .status-value {
+            margin-top: 3px;
+            color: var(--ios-label);
+            font-size: 23px;
+            font-weight: 650;
+            line-height: 1.15;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .status-value.normal {
+            color: var(--ios-label);
+        }
+
+        .risk-indicator {
+            gap: 12px;
+            margin-top: 10px;
+            padding: 14px;
+        }
+
+        .risk-indicator .status-value {
+            font-size: 17px;
+        }
+
+        .risk-dot {
+            flex: 0 0 auto;
+            width: 11px;
+            height: 11px;
+            box-shadow: none;
+        }
+
+        .risk-dot.safe {
+            background: var(--ios-green);
+        }
+
+        .risk-dot.low {
+            background: var(--ios-blue);
+        }
+
+        .risk-dot.medium {
+            background: var(--ios-orange);
+        }
+
+        .risk-dot.high,
+        .risk-dot.critical {
+            background: var(--ios-red);
+        }
+
+        .risk-dot.critical {
+            box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.14);
+        }
+
+        /* 风险等级文字随等级着色（不再仅靠圆点颜色区分） */
+        .risk-text.safe { color: var(--ios-green); }
+        .risk-text.low { color: var(--ios-blue); }
+        .risk-text.medium { color: var(--ios-orange); }
+        .risk-text.high { color: var(--ios-red); }
+        .risk-text.critical { color: var(--ios-red); font-weight: 700; }
+
+        .message-area {
+            min-height: 62px;
+            padding: 14px;
+        }
+
+        .message {
+            color: var(--ios-label);
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .message.info {
+            color: var(--ios-blue);
+        }
+
+        .message.warning {
+            color: var(--ios-red);
+        }
+
+        .detection-list {
+            max-height: 300px;
+        }
+
+        .detection-item {
+            margin-bottom: 8px;
+            padding: 11px 12px;
+        }
+
+        .detection-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .det-tag {
+            padding: 2px 7px;
+            color: var(--ios-secondary);
+            background: rgba(118, 118, 128, 0.12);
+            border-radius: 6px;
+        }
+
+        .det-tag.warn {
+            color: #b25000;
+            background: rgba(255, 149, 0, 0.12);
+        }
+
+        .det-tag.green {
+            color: #187a35;
+            background: rgba(52, 199, 89, 0.12);
+        }
+
+        .conf-bar {
+            width: 140px;
+            max-width: 100%;
+            height: 5px;
+            background: #d1d1d6;
+        }
+
+        .conf-bar i {
+            background: var(--ios-blue);
+        }
+
+        .det-sub {
+            color: var(--ios-secondary);
+            opacity: 1;
+        }
+
+        .timeline {
+            margin-top: 10px;
+        }
+
+        .timeline-item {
+            padding: 8px 10px;
+            border-left: 3px solid var(--ios-blue);
+            border-radius: 0 8px 8px 0;
+        }
+
+        .timeline-item.critical,
+        .timeline-item.high {
+            border-left-color: var(--ios-red);
+        }
+
+        .timeline-item.medium {
+            border-left-color: var(--ios-orange);
+        }
+
+        .timeline-item.seekable:hover {
+            background: rgba(0, 122, 255, 0.1);
+        }
+
+        .timeline-item .tl-time {
+            color: var(--ios-tertiary);
+            opacity: 1;
+        }
+
+        .upload-area {
+            min-height: 92px;
+            margin-top: 10px;
+            padding: 17px 14px;
+            text-align: center;
+            background: var(--ios-fill);
+            border: 1.5px dashed #c7c7cc;
+            border-radius: 8px;
+        }
+
+        .upload-area p {
+            color: var(--ios-blue);
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .upload-area small {
+            display: block;
+            margin-top: 4px;
+            color: var(--ios-secondary);
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .upload-area:hover {
+            background: rgba(0, 122, 255, 0.06);
+            border-color: var(--ios-blue);
+        }
+
+        .upload-area:focus-visible {
+            border-color: var(--ios-blue);
+            outline: 3px solid rgba(0, 122, 255, 0.26);
+            outline-offset: 2px;
+        }
+
+        .agent-badge {
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-weight: 500;
+        }
+
+        .agent-badge.on {
+            color: #187a35;
+            background: rgba(52, 199, 89, 0.13);
+        }
+
+        .agent-badge.off {
+            color: #8a4b00;
+            background: rgba(255, 149, 0, 0.13);
+        }
+
+        .safety-note {
+            margin: -5px 0 12px;
+            color: #9a6700;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .chat-box {
+            max-height: 200px;
+            margin-bottom: 10px;
+            padding: 12px;
+        }
+
+        .chat-msg {
+            width: fit-content;
+            max-width: 86%;
+            min-height: 34px;
+            margin-bottom: 8px;
+            padding: 8px 11px;
+            border-radius: 16px;
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+        }
+
+        .chat-msg.bot {
+            margin-right: auto;
+            color: var(--ios-label);
+            background: #e9e9ee;
+            border-bottom-left-radius: 5px;
+            text-align: left;
+        }
+
+        .chat-msg.user {
+            margin-left: auto;
+            color: #fff;
+            background: var(--ios-blue);
+            border-bottom-right-radius: 5px;
+            text-align: left;
+        }
+
+        .chat-msg .role {
+            margin-bottom: 2px;
+            color: inherit;
+            font-size: 11px;
+            opacity: 0.64;
+        }
+
+        .chat-input-row {
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chat-input-row input {
+            min-width: 0;
+            min-height: 44px;
+            padding: 10px 12px;
+            color: var(--ios-label);
+            background: var(--ios-card);
+            border: 1px solid #d1d1d6;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .chat-input-row input::placeholder {
+            color: var(--ios-tertiary);
+            opacity: 1;
+        }
+
+        .chat-input-row input:focus {
+            border-color: var(--ios-blue);
+            outline: 3px solid rgba(0, 122, 255, 0.18);
+            outline-offset: 0;
+        }
+
+        .chat-input-row button {
+            min-height: 44px;
+            padding: 10px 14px;
+        }
+
+        .mic-btn {
+            flex: 0 0 44px !important;
+            width: 44px;
+            padding: 0 !important;
+            font-size: 16px !important;
+        }
+
+        .mic-btn.listening {
+            color: #fff;
+            background: var(--ios-red);
+        }
+
+        .chip-row {
+            gap: 7px;
+            margin-bottom: 9px;
+        }
+
+        .chip {
+            min-height: 32px;
+            padding: 6px 11px;
+            color: var(--ios-blue);
+            background: rgba(0, 122, 255, 0.1);
+            border: 0;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background-color 0.16s ease, transform 0.16s ease;
+        }
+
+        .chip:hover {
+            color: var(--ios-blue);
+            background: rgba(0, 122, 255, 0.16);
+        }
+
+        .btn:focus-visible,
+        .tool-btn:focus-visible,
+        .control-btn:focus-visible,
+        .speed-btn:focus-visible,
+        .chip:focus-visible,
+        .progress-bar:focus-visible,
+        .timeline-item.seekable:focus-visible {
+            outline: 3px solid rgba(0, 122, 255, 0.3);
+            outline-offset: 2px;
+        }
+
+        body.hc {
+            color-scheme: dark;
+            color: #ffffff !important;
+            background: #000 !important;
+            font-size: 18px;
+        }
+
+        body.hc .header,
+        body.hc .video-section,
+        body.hc .video-header,
+        body.hc .video-controls,
+        body.hc .panel-card,
+        body.hc .status-item,
+        body.hc .risk-indicator,
+        body.hc .message-area,
+        body.hc .chat-box,
+        body.hc .detection-item,
+        body.hc .timeline-item,
+        body.hc .upload-area,
+        body.hc .chat-input-row input {
+            color: #ffffff !important;
+            background: #111111 !important;
+            border-color: #8e8e93 !important;
+            box-shadow: none !important;
+        }
+
+        body.hc .logo h1,
+        body.hc .logo p,
+        body.hc .video-header h3,
+        body.hc .panel-card h3,
+        body.hc .status-label,
+        body.hc .status-value,
+        body.hc .message,
+        body.hc .det-sub,
+        body.hc .timeline-item,
+        body.hc .timeline-item .tl-time,
+        body.hc .safety-note,
+        body.hc .chat-msg,
+        body.hc .chat-msg .role {
+            color: #ffffff !important;
+        }
+
+        body.hc .logo h1 {
+            font-size: 26px;
+        }
+
+        body.hc .logo p {
+            color: #d1d1d6 !important;
+            font-size: 15px;
+        }
+
+        body.hc .video-header h3,
+        body.hc .panel-card h3 {
+            font-size: 21px;
+        }
+
+        body.hc .status-label,
+        body.hc .chat-msg .role,
+        body.hc .det-sub,
+        body.hc .timeline-item .tl-time {
+            color: #d1d1d6 !important;
+            font-size: 15px;
+        }
+
+        body.hc .status-value {
+            font-size: 28px;
+        }
+
+        body.hc .risk-indicator .status-value,
+        body.hc #sceneType {
+            font-size: 20px !important;
+        }
+
+        body.hc .message {
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        body.hc .message.info,
+        body.hc .agent-badge.on {
+            color: #64d2ff !important;
+        }
+
+        body.hc .agent-badge {
+            font-size: 15px;
+        }
+
+        body.hc .safety-note {
+            color: #ffd60a !important;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        body.hc .upload-area p {
+            font-size: 18px;
+        }
+
+        body.hc .upload-area small {
+            color: #d1d1d6 !important;
+            font-size: 15px;
+        }
+
+        body.hc .timeline {
+            font-size: 16px;
+        }
+
+        body.hc .timeline-item {
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        body.hc .detection-item {
+            font-size: 17px;
+        }
+
+        body.hc .det-tag {
+            font-size: 15px;
+        }
+
+        body.hc .chat-msg {
+            font-size: 17px;
+            line-height: 1.55;
+        }
+
+        body.hc .chat-input-row input {
+            font-size: 17px;
+        }
+
+        body.hc .message.warning,
+        body.hc .det-tag.warn {
+            color: #ff453a !important;
+        }
+
+        body.hc .det-tag.green {
+            color: #30d158 !important;
+        }
+
+        body.hc .btn {
+            font-size: 18px;
+            font-weight: 700;
+            border: 2px solid transparent !important;
+        }
+
+        body.hc .btn-primary {
+            color: #ffffff !important;
+            background: #0a84ff !important;
+        }
+
+        body.hc .btn-success {
+            color: #000000 !important;
+            background: #30d158 !important;
+        }
+
+        body.hc .btn-danger {
+            color: #ffffff !important;
+            background: #ff453a !important;
+        }
+
+        body.hc .btn-secondary {
+            color: #ffffff !important;
+            background: #2c2c2e !important;
+            border-color: #d1d1d6 !important;
+        }
+
+        body.hc .tool-btn {
+            color: #ffd60a !important;
+            background: #1c1c1e !important;
+            border: 2px solid #ffd60a !important;
+            font-size: 16px;
+            min-height: 44px;
+        }
+
+        body.hc .control-btn,
+        body.hc .speed-btn {
+            color: #ffffff !important;
+            background: #1c1c1e !important;
+            border: 2px solid #8e8e93 !important;
+            font-size: 16px;
+        }
+
+        body.hc .speed-btn.active {
+            color: #000000 !important;
+            background: #ffd60a !important;
+            border-color: #ffd60a !important;
+        }
+
+        body.hc .chip {
+            color: #ffd60a !important;
+            background: #1c1c1e !important;
+            border: 2px solid #ffd60a !important;
+            font-size: 16px;
+            min-height: 44px;
+        }
+
+        body.hc .chat-input-row input {
+            border: 2px solid #d1d1d6 !important;
+        }
+
+        body.hc .chat-input-row input::placeholder {
+            color: #d1d1d6 !important;
+        }
+
+        body.hc .btn:disabled,
+        body.hc .tool-btn:disabled,
+        body.hc .control-btn:disabled,
+        body.hc .speed-btn:disabled {
+            color: #8e8e93 !important;
+            background: #1c1c1e !important;
+            border-color: #48484a !important;
+            opacity: 1;
+        }
+
+        body.hc .progress-bar::before {
+            background: #8e8e93 !important;
+        }
+
+        body.hc .progress-fill,
+        body.hc .conf-bar i {
+            background: #ffd60a !important;
+        }
+
+        body.hc .conf-bar {
+            background: #48484a !important;
+        }
+
+        body.hc .chat-msg.bot {
+            color: #ffffff !important;
+            background: #1c1c1e !important;
+            border: 2px solid #8e8e93;
+        }
+
+        body.hc .chat-msg.user {
+            color: #ffffff !important;
+            background: #0a84ff !important;
+            border: 2px solid #64d2ff;
+        }
+
+        body.hc .time-display {
+            color: #ffffff !important;
+            font-size: 15px;
+        }
+
+        body.hc .btn:focus-visible,
+        body.hc .tool-btn:focus-visible,
+        body.hc .control-btn:focus-visible,
+        body.hc .speed-btn:focus-visible,
+        body.hc .chip:focus-visible,
+        body.hc .progress-bar:focus-visible,
+        body.hc .timeline-item.seekable:focus-visible {
+            outline: 3px solid #ffd60a;
+            outline-offset: 3px;
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                flex-direction: column;
+            }
+
+            .video-section,
+            .control-panel {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                gap: 8px;
+                padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+                flex-wrap: wrap;
+            }
+
+            .main-container {
+                gap: 12px;
+                padding: 10px;
+            }
+
+            .video-header {
+                padding: 12px 14px;
+            }
+
+            .video-container {
+                aspect-ratio: 4 / 3;
+                max-height: none;
+            }
+
+            .video-controls {
+                grid-template-columns: auto minmax(0, 1fr) auto;
+                grid-template-areas:
+                    "control progress time"
+                    "speeds speeds speeds";
+                gap: 8px;
+                padding: 9px 12px 11px;
+            }
+
+            #btnPause {
+                grid-area: control;
+            }
+
+            #progressBar {
+                grid-area: progress;
+            }
+
+            #timeDisplay {
+                grid-area: time;
+            }
+
+            .video-controls .btn-group {
+                grid-area: speeds;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                min-width: 0;
+                width: 100%;
+                gap: 8px;
+            }
+
+            .control-btn,
+            .speed-btn {
+                min-height: 44px;
+            }
+
+            .progress-bar {
+                min-height: 44px;
+            }
+
+            .time-display {
+                min-width: 84px;
+                font-size: 11px;
+            }
+
+            .panel-card {
+                padding: 16px;
+            }
+
+            .btn {
+                min-height: 44px;
+                padding: 11px 12px;
+                font-size: 15px;
+            }
+
+            .tool-btn {
+                min-height: 44px;
+            }
+
+            .upload-area {
+                min-height: 96px;
+            }
+
+            .timeline-item.seekable {
+                display: flex;
+                align-items: center;
+                min-height: 44px;
+            }
+
+            .chat-input-row input,
+            .chat-input-row button {
+                min-height: 44px;
+            }
+
+            .chip {
+                min-height: 44px;
+                padding: 10px 14px;
+                font-size: 13px;
+            }
+
+            .chat-box {
+                max-height: 170px;
+            }
+
+            .detection-list {
+                max-height: 240px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+            }
         }
     </style>
 </head>
@@ -331,12 +1422,12 @@
         <div class="logo">
             <div>
                 <h1>BlindGuard</h1>
-                <p>智能导盲系统 V2.2.1 · 多模态感知智能体</p>
+                <p>智能导盲系统 V{{ version }} · 多模态感知智能体</p>
             </div>
         </div>
         <div class="header-tools">
             <button class="tool-btn" id="btnContrast" onclick="toggleContrast()"
-                    aria-label="切换高对比度大字模式">👁 大字模式</button>
+                    aria-label="切换高对比度大字模式" aria-pressed="false">👁 大字模式</button>
         </div>
     </header>
 
@@ -345,16 +1436,23 @@
             <div class="video-header">
                 <h3>实时监控</h3>
                 <button class="tool-btn" id="btnOverlay" onclick="toggleOverlay()"
-                        aria-label="切换中文标签覆盖层">标签层: 开</button>
+                        aria-label="切换中文标签覆盖层" aria-pressed="true">标签层: 开</button>
             </div>
             <div class="video-container" id="videoContainer">
-                <img id="videoFeed" src="/video_feed" alt="视频流">
+                <img id="videoFeed" src="{{ video_feed_url }}" alt="视频流">
                 <canvas id="overlay" class="overlay-canvas"></canvas>
+                <div class="video-placeholder" id="videoPlaceholder">
+                    <p id="videoPlaceholderText">尚未开始检测</p>
+                    <small>启动系统并开启摄像头，或上传视频后，这里会显示实时画面</small>
+                </div>
             </div>
             <!-- 视频控制栏 -->
             <div class="video-controls" id="videoControls" style="display:none;">
                 <button class="control-btn" id="btnPause" onclick="togglePause()">暂停</button>
-                <div class="progress-bar" id="progressBar" onclick="seekVideo(event)">
+                <div class="progress-bar" id="progressBar" role="slider" tabindex="0"
+                     aria-label="视频进度" aria-valuemin="0" aria-valuemax="0"
+                     aria-valuenow="0" aria-valuetext="0:00 / 0:00"
+                     onclick="seekVideo(event)" onkeydown="seekVideoByKeyboard(event)">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
                 <div class="time-display" id="timeDisplay">0:00 / 0:00</div>
@@ -378,7 +1476,9 @@
                     <button class="btn btn-primary" id="btnStartCamera" onclick="startCamera()" disabled>开启摄像头</button>
                     <button class="btn btn-secondary" id="btnStopCamera" onclick="stopCamera()" disabled>关闭摄像头</button>
                 </div>
-                <div class="upload-area" onclick="document.getElementById('videoFile').click()">
+                <div class="upload-area" role="button" tabindex="0" aria-label="上传视频文件"
+                     onclick="document.getElementById('videoFile').click()"
+                     onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); document.getElementById('videoFile').click(); }">
                     <input type="file" id="videoFile" accept="video/*" onchange="uploadVideo(this)">
                     <p>点击上传视频文件</p>
                     <small>支持 mp4, avi, mov 等格式</small>
@@ -432,8 +1532,9 @@
                 <h3>智能对话
                     <span class="agent-badge off" id="agentBadge">本地回退</span>
                 </h3>
+                <p class="safety-note" role="note">环境辅助提示，不构成通行许可。请始终结合盲杖、交通规则和现场判断。</p>
                 <div class="chat-box" id="chatBox" role="log" aria-label="对话记录">
-                    <div class="chat-msg bot"><div class="role">导盲助手</div>你好，我可以回答你周围环境的问题，例如"前面有什么"</div>
+                    <div class="chat-msg bot"><div class="role">导盲助手</div>你好，我可以描述周围环境，但不能批准通行。例如"前面有什么"</div>
                 </div>
                 <div class="chip-row" id="chipRow">
                     <button class="chip" onclick="quickAsk('前面有什么')">前面有什么</button>
@@ -445,24 +1546,79 @@
                     <input id="chatInput" type="text" placeholder="问我周围有什么... (按 / 聚焦)"
                            aria-label="输入问题" onkeydown="if(event.key==='Enter')sendChat()">
                     <button class="btn btn-secondary mic-btn" id="btnMic" onclick="toggleMic()" title="语音输入" aria-label="语音输入">🎤</button>
-                    <button class="btn btn-primary" onclick="sendChat()" aria-label="发送">发送</button>
+                    <button class="btn btn-primary" id="btnSend" onclick="sendChat()" aria-label="发送">发送</button>
                 </div>
             </div>
         </aside>
     </main>
 
     <script>
+        const AUTH_TOKEN = {{ auth_token|tojson }};
+        const VIDEO_FEED_URL = {{ video_feed_url|tojson }};
         let systemRunning = false;
         let cameraActive = false;
         let videoActive = false;
         let videoPaused = false;
         let currentSpeed = 1.0;
+        let videoTotal = 0;
         let statusInterval = null;
+        let chatRequestQueue = Promise.resolve();
+
+        function apiFetch(url, options = {}) {
+            const requestOptions = { ...options };
+            const headers = new Headers(options.headers || {});
+            if (AUTH_TOKEN) headers.set('X-BlindGuard-Token', AUTH_TOKEN);
+            requestOptions.headers = headers;
+            return fetch(url, requestOptions);
+        }
+
+        function refreshedVideoFeedUrl() {
+            const url = new URL(VIDEO_FEED_URL, window.location.origin);
+            if (AUTH_TOKEN) url.searchParams.set('token', AUTH_TOKEN);
+            url.searchParams.set('_', Date.now().toString());
+            return url.pathname + url.search;
+        }
+
+        function showVideoFeed() {
+            document.getElementById('videoFeed').style.visibility = 'visible';
+            hideVideoPlaceholder();
+        }
+
+        function clearOverlay() {
+            const canvas = document.getElementById('overlay');
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function setVideoPlaceholder(text) {
+            const ph = document.getElementById('videoPlaceholder');
+            if (!ph) return;
+            if (text) document.getElementById('videoPlaceholderText').textContent = text;
+            ph.style.display = 'flex';
+        }
+
+        function hideVideoPlaceholder() {
+            const ph = document.getElementById('videoPlaceholder');
+            if (ph) ph.style.display = 'none';
+        }
+
+        function hideVideoFeed() {
+            document.getElementById('videoFeed').style.visibility = 'hidden';
+            clearOverlay();
+            setVideoPlaceholder('尚未开始检测');
+        }
+
+        document.getElementById('videoFeed').addEventListener('error', () => {
+            // 视频流中断时给出可见提示，而不是无声黑屏
+            if (systemRunning && (cameraActive || videoActive)) {
+                setVideoPlaceholder('视频流连接中断，请检查摄像头或重新开启');
+            }
+        });
 
         // 系统控制
         async function startSystem() {
             try {
-                const res = await fetch('/api/system/start', { method: 'POST' });
+                const res = await apiFetch('/api/system/start', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
                     systemRunning = true;
@@ -477,30 +1633,37 @@
 
         async function stopSystem() {
             try {
-                const res = await fetch('/api/system/stop', { method: 'POST' });
+                const res = await apiFetch('/api/system/stop', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
                     systemRunning = false;
                     cameraActive = false;
                     videoActive = false;
+                    videoPaused = false;
+                    resetVideoProgress();
+                    hideVideoFeed();
                     updateUI();
-                    showMessage('系统已停止', 'info');
+                    await updateStatus();
                     stopStatusPolling();
                     document.getElementById('videoControls').style.display = 'none';
+                    showMessage('系统已停止', 'info');
                 }
             } catch (e) { showMessage('停止失败: ' + e.message, 'warning'); }
         }
 
         async function startCamera() {
             try {
-                const res = await fetch('/api/camera/start', { method: 'POST' });
+                const res = await apiFetch('/api/camera/start', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
                     cameraActive = true;
                     videoActive = false;
+                    resetVideoProgress();
+                    showVideoFeed();
                     document.getElementById('videoControls').style.display = 'none';
                     updateUI();
                     showMessage('摄像头已开启', 'info');
+                    startStatusPolling();
                 } else {
                     showMessage('摄像头启动失败: ' + data.message, 'warning');
                 }
@@ -509,11 +1672,13 @@
 
         async function stopCamera() {
             try {
-                const res = await fetch('/api/camera/stop', { method: 'POST' });
+                const res = await apiFetch('/api/camera/stop', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
                     cameraActive = false;
+                    hideVideoFeed();
                     updateUI();
+                    await updateStatus();
                     showMessage('摄像头已关闭', 'info');
                 }
             } catch (e) { showMessage('关闭失败: ' + e.message, 'warning'); }
@@ -527,15 +1692,22 @@
             formData.append('video', file);
             try {
                 showMessage('正在上传视频...', 'info');
-                const res = await fetch('/api/video/upload', { method: 'POST', body: formData });
+                const res = await apiFetch('/api/video/upload', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
+                    systemRunning = true;
                     videoActive = true;
                     cameraActive = false;
+                    videoPaused = false;
+                    currentSpeed = 1.0;
+                    syncVideoTotal(data.total_frames);
+                    syncSpeedButtons(currentSpeed);
+                    document.getElementById('btnPause').textContent = '暂停';
                     updateUI();
                     showMessage('视频上传成功，开始检测', 'info');
-                    document.getElementById('videoControls').style.display = 'flex';
-                    document.getElementById('videoFeed').src = '/video_feed?' + new Date().getTime();
+                    document.getElementById('videoControls').style.display = 'grid';
+                    document.getElementById('videoFeed').src = refreshedVideoFeedUrl();
+                    showVideoFeed();
                     startStatusPolling();
                 } else {
                     showMessage('上传失败: ' + data.message, 'warning');
@@ -548,56 +1720,86 @@
         async function togglePause() {
             const endpoint = videoPaused ? '/api/video/resume' : '/api/video/pause';
             try {
-                const res = await fetch(endpoint, { method: 'POST' });
+                const res = await apiFetch(endpoint, { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
                     videoPaused = !videoPaused;
                     document.getElementById('btnPause').textContent = videoPaused ? '播放' : '暂停';
+                } else {
+                    showMessage('视频控制失败: ' + (data.message || '未知错误'), 'warning');
                 }
-            } catch (e) {}
+            } catch (e) {
+                showMessage('视频控制失败: ' + e.message, 'warning');
+            }
         }
 
-        function seekVideo(event) {
+        async function seekVideo(event) {
+            if (!videoActive || videoTotal <= 0) {
+                showMessage('回跳仅支持已加载视频', 'warning');
+                return;
+            }
             const bar = document.getElementById('progressBar');
             const rect = bar.getBoundingClientRect();
-            const percent = (event.clientX - rect.left) / rect.width;
-            const totalFrames = parseInt(document.getElementById('timeDisplay').dataset.total || 0);
-            const targetFrame = Math.floor(percent * totalFrames);
+            const percent = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+            const targetFrame = Math.min(videoTotal - 1, Math.floor(percent * videoTotal));
+            await seekToFrame(targetFrame, '已回跳到目标位置');
+        }
 
-            fetch('/api/video/seek', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ frame: targetFrame })
-            });
+        async function seekVideoByKeyboard(event) {
+            const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'];
+            if (!keys.includes(event.key)) return;
+            event.preventDefault();
+            if (!videoActive || videoTotal <= 0) {
+                showMessage('回跳仅支持已加载视频', 'warning');
+                return;
+            }
+            const bar = document.getElementById('progressBar');
+            const current = Number(bar.getAttribute('aria-valuenow') || 0);
+            const pageStep = Math.max(1, Math.round(videoTotal * 0.1));
+            const lineStep = Math.max(1, Math.round(videoTotal * 0.01));
+            let target = current;
+            if (event.key === 'Home') target = 0;
+            else if (event.key === 'End') target = videoTotal - 1;
+            else if (event.key === 'ArrowLeft') target -= lineStep;
+            else if (event.key === 'ArrowRight') target += lineStep;
+            else if (event.key === 'PageUp') target -= pageStep;
+            else if (event.key === 'PageDown') target += pageStep;
+            target = Math.min(videoTotal - 1, Math.max(0, target));
+            await seekToFrame(target, `已回跳到 ${formatTime(target)}`);
         }
 
         async function setSpeed(speed) {
-            currentSpeed = speed;
             try {
-                const res = await fetch('/api/video/speed', {
+                const res = await apiFetch('/api/video/speed', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ speed: speed })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    // 更新按钮状态
-                    document.querySelectorAll('.speed-btn').forEach(btn => {
-                        btn.classList.toggle('active', parseFloat(btn.textContent) === speed);
-                    });
-                    showMessage(`播放倍速: ${speed}x`, 'info');
+                    currentSpeed = Number(data.speed || speed);
+                    syncSpeedButtons(currentSpeed);
+                    showMessage(`播放倍速: ${currentSpeed}x`, 'info');
+                } else {
+                    showMessage('倍速切换失败: ' + (data.message || '未知错误'), 'warning');
                 }
-            } catch (e) {}
+            } catch (e) {
+                showMessage('倍速切换失败: ' + e.message, 'warning');
+            }
         }
 
         async function stopVideo() {
             try {
-                const res = await fetch('/api/video/stop', { method: 'POST' });
+                const res = await apiFetch('/api/video/stop', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
                     videoActive = false;
-                    document.getElementById('videoControls').style.display = 'none';
+                    videoPaused = false;
+                    resetVideoProgress();
+                    hideVideoFeed();
                     updateUI();
+                    await updateStatus();
+                    document.getElementById('videoControls').style.display = 'none';
                     showMessage('视频播放已停止', 'info');
                 }
             } catch (e) { showMessage('停止失败: ' + e.message, 'warning'); }
@@ -606,7 +1808,34 @@
         // 状态轮询
         function startStatusPolling() {
             if (statusInterval) clearInterval(statusInterval);
+            if (document.hidden) return;  // 后台标签页不轮询，省电省 CPU
             statusInterval = setInterval(updateStatus, 500);
+        }
+
+        // 标签页切到后台暂停轮询，切回前台且系统运行中则恢复
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopStatusPolling();
+            } else if (systemRunning) {
+                startStatusPolling();
+                updateStatus();
+            }
+        });
+
+        function syncVideoTotal(total) {
+            videoTotal = Math.max(0, Number(total) || 0);
+            document.getElementById('timeDisplay').dataset.total = videoTotal;
+            document.getElementById('progressBar')
+                .setAttribute('aria-valuemax', String(videoTotal));
+        }
+
+        function resetVideoProgress() {
+            syncVideoTotal(0);
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('timeDisplay').textContent = '0:00 / 0:00';
+            const bar = document.getElementById('progressBar');
+            bar.setAttribute('aria-valuenow', '0');
+            bar.setAttribute('aria-valuetext', '0:00 / 0:00');
         }
 
         function stopStatusPolling() {
@@ -622,18 +1851,26 @@
         }
 
         async function updateStatus() {
+            // 系统状态与检测结果并发拉取，任一路失败不影响另一路
+            const statusPromise = apiFetch('/api/system/status')
+                .then((r) => r.json()).catch(() => null);
+            const detectionsPromise = apiFetch('/api/detections')
+                .then((r) => r.json()).catch(() => null);
+            const RISK_NAMES = { safe: '安全', low: '低风险', medium: '中等风险', high: '高风险', critical: '极高风险' };
             try {
                 // 更新系统状态
-                const res = await fetch('/api/system/status');
-                const data = await res.json();
+                const data = await statusPromise;
+                if (data === null) throw new Error('status fetch failed');
                 document.getElementById('fpsValue').textContent = Math.round(data.fps || 0);
                 document.getElementById('objectCount').textContent = data.detection_count || 0;
 
                 // 整体风险等级（由后端 RiskEvaluator 综合评估）
-                const risk = data.overall_risk || 'safe';
+                const risk = Object.prototype.hasOwnProperty.call(RISK_NAMES, data.overall_risk)
+                    ? data.overall_risk : 'safe';
                 document.getElementById('riskDot').className = 'risk-dot ' + risk;
-                const names = { safe: '安全', low: '低风险', medium: '中等风险', high: '高风险', critical: '极高风险' };
-                document.getElementById('riskLevel').textContent = names[risk] || '安全';
+                const riskLevelEl = document.getElementById('riskLevel');
+                riskLevelEl.textContent = RISK_NAMES[risk];
+                riskLevelEl.className = 'status-value risk-text ' + risk;
 
                 // 场景类型
                 document.getElementById('sceneType').textContent = data.scene_type_cn || '-';
@@ -641,11 +1878,52 @@
                 // 播报时间线（点击可回跳视频位置）
                 if (data.events) {
                     const tl = document.getElementById('timeline');
-                    tl.innerHTML = data.events.map((e) => {
-                        const cls = `timeline-item ${e.level}${e.frame ? ' seekable' : ''}`;
-                        const onclk = e.frame ? ` onclick="seekToFrame(${e.frame})"` : '';
-                        return `<div class="${cls}"${onclk}><span class="tl-time">${e.time}</span> · ${e.text}</div>`;
-                    }).join('');
+                    const timelineSignature = data.events.map((event) => (
+                        `${event.frame || ''}|${event.time || ''}|${event.text || ''}|${event.level || ''}`
+                    )).join('\n');
+                    if (tl.dataset.signature !== timelineSignature) {
+                        const focusedFrame = document.activeElement
+                            ?.closest?.('.timeline-item.seekable')?.dataset.frame;
+                        tl.replaceChildren();
+                        data.events.forEach((event) => {
+                            const item = document.createElement('div');
+                            const level = ['critical', 'high', 'medium', 'low', 'safe'].includes(event.level)
+                                ? event.level : 'safe';
+                            item.className = `timeline-item ${level}${event.frame ? ' seekable' : ''}`;
+                            if (event.frame) {
+                                item.dataset.frame = String(event.frame);
+                                item.setAttribute('role', 'button');
+                                item.tabIndex = 0;
+                                item.setAttribute(
+                                    'aria-label',
+                                    `回跳到 ${event.time || ''} ${event.text || ''}`.trim()
+                                );
+                                item.addEventListener('click', () => seekToFrame(event.frame));
+                                item.addEventListener('keydown', (keyEvent) => {
+                                    if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+                                        keyEvent.preventDefault();
+                                        seekToFrame(event.frame);
+                                    }
+                                });
+                            }
+                            const time = document.createElement('span');
+                            time.className = 'tl-time';
+                            time.textContent = event.time || '';
+                            item.appendChild(time);
+                            item.appendChild(document.createTextNode(' · '));
+                            item.appendChild(document.createTextNode(event.text || ''));
+                            tl.appendChild(item);
+                        });
+                        if (focusedFrame) {
+                            const replacement = Array.from(
+                                tl.querySelectorAll('.timeline-item.seekable')
+                            ).find((item) => item.dataset.frame === focusedFrame);
+                            if (replacement) {
+                                replacement.focus({ preventScroll: true });
+                            }
+                        }
+                        tl.dataset.signature = timelineSignature;
+                    }
                 }
                 window._fw = data.frame_w || window._fw;
                 window._fh = data.frame_h || window._fh;
@@ -658,13 +1936,19 @@
                 // 更新视频进度
                 if (data.video_active) {
                     const pos = data.video_position || 0;
-                    const total = data.video_total || 1;
+                    syncVideoTotal(data.video_total);
+                    const total = videoTotal || 1;
                     const percent = (pos / total * 100).toFixed(1);
                     document.getElementById('progressFill').style.width = percent + '%';
 
                     const timeDisplay = document.getElementById('timeDisplay');
                     timeDisplay.textContent = `${formatTime(pos)} / ${formatTime(total)}`;
-                    timeDisplay.dataset.total = total;
+                    const progressBar = document.getElementById('progressBar');
+                    progressBar.setAttribute('aria-valuenow', String(pos));
+                    progressBar.setAttribute(
+                        'aria-valuetext',
+                        `${formatTime(pos)} / ${formatTime(total)}`
+                    );
 
                     // 更新暂停按钮
                     videoPaused = data.video_paused;
@@ -673,54 +1957,89 @@
                     // 更新倍速按钮
                     if (data.video_speed !== currentSpeed) {
                         currentSpeed = data.video_speed;
-                        document.querySelectorAll('.speed-btn').forEach(btn => {
-                            btn.classList.toggle('active', parseFloat(btn.textContent) === currentSpeed);
-                        });
+                        syncSpeedButtons(currentSpeed);
                     }
                 }
             } catch (e) {}
 
             // 更新检测结果
             try {
-                const res = await fetch('/api/detections');
-                const data = await res.json();
+                const data = await detectionsPromise;
+                if (data === null) throw new Error('detections fetch failed');
                 const list = document.getElementById('detectionList');
+                const scrollTop = list.scrollTop;  // 记录滚动位置，重建后恢复
+                list.replaceChildren();
                 if (!data.detections || data.detections.length === 0) {
-                    list.innerHTML = '<div class="message info">暂无检测结果</div>';
+                    const empty = document.createElement('div');
+                    empty.className = 'message info';
+                    empty.textContent = '暂无检测结果';
+                    list.appendChild(empty);
+                    drawOverlay([], window._fw, window._fh);  // 清空残留标注框
                     return;
                 }
-                let html = '';
                 data.detections.forEach(det => {
                     // 轨迹置信度优先（目标历史最高确认度，稳定），单帧置信度兜底
-                    const confV = det.conf_smooth != null ? det.conf_smooth : det.confidence;
-                    const conf = (confV * 100).toFixed(1);
-                    const risk = det.risk_level || 'safe';
+                    const confV = det.conf_stable != null ? det.conf_stable
+                        : (det.conf_smooth != null ? det.conf_smooth : det.confidence);
+                    const conf = Math.max(0, Math.min(100, Number(confV || 0) * 100)).toFixed(1);
+                    const risk = ['critical', 'high', 'medium', 'low', 'safe'].includes(det.risk_level)
+                        ? det.risk_level : 'safe';
                     const score = det.risk_score != null ? (det.risk_score * 100).toFixed(0) : '-';
                     const name = det.class_name_cn || det.class_name || '未知';
                     const zone = { left: '左侧', center: '正前方', right: '右侧' }[det.position_zone] || '';
                     const dur = det.track_age != null ? ` · 已出现 ${det.track_age}s` : '';
-                    let tags = '';
+                    const item = document.createElement('div');
+                    item.className = 'detection-item';
+                    item.style.display = 'block';
+
+                    const header = document.createElement('div');
+                    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center';
+                    const title = document.createElement('div');
+                    const nameEl = document.createElement('b');
+                    nameEl.textContent = name;
+                    title.appendChild(nameEl);
+
                     if (det.light_state && det.light_state !== 'unknown') {
                         const lc = { red: '红灯', yellow: '黄灯', green: '绿灯' }[det.light_state];
                         if (lc) {
-                            const cls = det.light_state === 'green' ? 'det-tag green' : 'det-tag warn';
-                            tags += `<span class="${cls}">${lc}</span>`;
+                            const tag = document.createElement('span');
+                            tag.className = det.light_state === 'green' ? 'det-tag green' : 'det-tag warn';
+                            tag.textContent = lc;
+                            title.appendChild(tag);
                         }
                     }
-                    if (det.trend === 'approaching') tags += '<span class="det-tag warn">↑接近中</span>';
-                    else if (det.trend === 'receding') tags += '<span class="det-tag">↓远离</span>';
-                    html += `<div class="detection-item" style="display:block">
-                        <div style="display:flex;justify-content:space-between;align-items:center">
-                            <div><b>${name}</b>${tags}</div>
-                            <div class="risk-dot ${risk}"></div>
-                        </div>
-                        <div class="conf-bar" title="轨迹置信度 ${conf}%（该目标历史最高确认度）"><i style="width:${conf}%"></i></div>
-                        <div class="det-sub">轨迹置信度 ${conf}% · 风险分 ${score}${zone ? ' · ' + zone : ''}${dur}</div>
-                    </div>`;
+                    if (det.trend === 'approaching' || det.trend === 'receding') {
+                        const tag = document.createElement('span');
+                        tag.className = det.trend === 'approaching' ? 'det-tag warn' : 'det-tag';
+                        tag.textContent = det.trend === 'approaching' ? '↑接近中' : '↓远离';
+                        title.appendChild(tag);
+                    }
+                    const riskDot = document.createElement('div');
+                    riskDot.className = `risk-dot ${risk}`;
+                    riskDot.title = RISK_NAMES[risk];
+                    header.appendChild(title);
+                    header.appendChild(riskDot);
+
+                    const confBar = document.createElement('div');
+                    confBar.className = 'conf-bar';
+                    confBar.title = `轨迹置信度 ${conf}%（该目标历史最高确认度）`;
+                    const confFill = document.createElement('i');
+                    confFill.style.width = `${conf}%`;
+                    confBar.appendChild(confFill);
+
+                    const detail = document.createElement('div');
+                    detail.className = 'det-sub';
+                    detail.textContent = `轨迹置信度 ${conf}% · ${RISK_NAMES[risk]} ${score}分`
+                        + (zone ? ` · ${zone}` : '') + dur;
+
+                    item.appendChild(header);
+                    item.appendChild(confBar);
+                    item.appendChild(detail);
+                    list.appendChild(item);
                 });
-                    list.innerHTML = html;
-                    drawOverlay(data.detections, window._fw, window._fh);
-                } catch (e) {}
+                list.scrollTop = scrollTop;  // 恢复滚动位置，避免每 500ms 跳回顶部
+                drawOverlay(data.detections, window._fw, window._fh);
+            } catch (e) {}
         }
 
         function updateUI() {
@@ -731,9 +2050,19 @@
             document.getElementById('btnStopVideo').disabled = !videoActive;
         }
 
+        function syncSpeedButtons(speed) {
+            document.querySelectorAll('.speed-btn').forEach(btn => {
+                btn.classList.toggle('active', parseFloat(btn.textContent) === speed);
+            });
+        }
+
         function showMessage(text, type = 'info') {
             const area = document.getElementById('messageArea');
-            area.innerHTML = `<div class="message ${type}">${text}</div>`;
+            const message = document.createElement('div');
+            const safeType = ['info', 'warning'].includes(type) ? type : 'info';
+            message.className = `message ${safeType}`;
+            message.textContent = text;
+            area.replaceChildren(message);
         }
 
         // ===== 语音输入：Web Speech API 优先，Whisper 浏览器内离线识别兜底 =====
@@ -859,7 +2188,9 @@
 
         function applyOverlay() {
             document.getElementById('overlay').style.display = overlayOn ? 'block' : 'none';
-            document.getElementById('btnOverlay').textContent = '标签层: ' + (overlayOn ? '开' : '关');
+            const button = document.getElementById('btnOverlay');
+            button.textContent = '标签层: ' + (overlayOn ? '开' : '关');
+            button.setAttribute('aria-pressed', overlayOn ? 'true' : 'false');
         }
         function toggleOverlay() {
             overlayOn = !overlayOn;
@@ -905,24 +2236,58 @@
             }
         }
 
-        function seekToFrame(f) {
+        async function seekToFrame(f, successMessage = '已回跳到事件发生位置') {
             if (!videoActive) { showMessage('回跳仅支持视频模式', 'info'); return; }
-            fetch('/api/video/seek', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ frame: f })
-            });
-            showMessage('已回跳到事件发生位置', 'info');
+            try {
+                const res = await apiFetch('/api/video/seek', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ frame: f })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const actualFrame = Number.isFinite(Number(data.frame))
+                        ? Number(data.frame)
+                        : Number(f);
+                    const total = videoTotal || 0;
+                    const percent = total > 0
+                        ? Math.min(100, Math.max(0, actualFrame / total * 100))
+                        : 0;
+                    const bar = document.getElementById('progressBar');
+                    document.getElementById('progressFill').style.width = percent + '%';
+                    document.getElementById('timeDisplay').textContent =
+                        `${formatTime(actualFrame)} / ${formatTime(total)}`;
+                    bar.setAttribute('aria-valuenow', String(actualFrame));
+                    bar.setAttribute(
+                        'aria-valuetext',
+                        `${formatTime(actualFrame)} / ${formatTime(total)}`
+                    );
+                    showMessage(successMessage, 'info');
+                } else {
+                    showMessage('回跳失败: ' + (data.message || '未知错误'), 'warning');
+                }
+            } catch (e) {
+                showMessage('回跳失败: ' + e.message, 'warning');
+            }
         }
 
         // 大字高对比模式（低视力用户，localStorage 记忆）
+        function applyContrastState() {
+            const active = document.body.classList.contains('hc');
+            const button = document.getElementById('btnContrast');
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            button.setAttribute('aria-label', active ? '关闭大字模式' : '开启大字模式');
+            button.title = active ? '关闭大字模式' : '开启大字模式';
+        }
         function toggleContrast() {
             document.body.classList.toggle('hc');
             localStorage.setItem('bg_hc', document.body.classList.contains('hc') ? '1' : '0');
+            applyContrastState();
         }
         if (localStorage.getItem('bg_hc') === '1') {
             document.body.classList.add('hc');
         }
+        applyContrastState();
 
         // 快捷提问
         function quickAsk(q) {
@@ -948,27 +2313,24 @@
             if (!q) return;
             input.value = '';
             appendChat('user', q);
-            appendChat('bot', '思考中...');
-            try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: q })
-                });
-                const data = await res.json();
-                // 替换"思考中..."
-                const box = document.getElementById('chatBox');
-                box.lastChild.remove();
-                if (data.success) {
-                    appendChat('bot', data.reply);
-                } else {
-                    appendChat('bot', '抱歉，出错了：' + data.message);
+            const pending = appendChat('bot', '思考中...');
+            chatRequestQueue = chatRequestQueue.then(async () => {
+                try {
+                    const res = await apiFetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: q })
+                    });
+                    const data = await res.json();
+                    const reply = data.success
+                        ? data.reply
+                        : '抱歉，出错了：' + data.message;
+                    replaceChatMessage(pending, 'bot', reply);
+                } catch (e) {
+                    replaceChatMessage(pending, 'bot', '网络错误：' + e.message);
                 }
-            } catch (e) {
-                const box = document.getElementById('chatBox');
-                box.lastChild.remove();
-                appendChat('bot', '网络错误：' + e.message);
-            }
+            });
+            return chatRequestQueue;
         }
 
         function appendChat(role, text) {
@@ -976,15 +2338,35 @@
             const div = document.createElement('div');
             div.className = 'chat-msg ' + role;
             const label = role === 'user' ? '我' : '导盲助手';
-            div.innerHTML = `<div class="role">${label}</div>${text}`;
+            const roleEl = document.createElement('div');
+            roleEl.className = 'role';
+            roleEl.textContent = label;
+            div.appendChild(roleEl);
+            div.appendChild(document.createTextNode(text));
             box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+            return div;
+        }
+
+        function replaceChatMessage(oldElement, role, text) {
+            if (!oldElement || !oldElement.isConnected) return;
+            const box = document.getElementById('chatBox');
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + role;
+            const label = role === 'user' ? '我' : '导盲助手';
+            const roleEl = document.createElement('div');
+            roleEl.className = 'role';
+            roleEl.textContent = label;
+            div.appendChild(roleEl);
+            div.appendChild(document.createTextNode(text));
+            oldElement.replaceWith(div);
             box.scrollTop = box.scrollHeight;
         }
 
         // 智能体状态轮询
         async function updateAgentStatus() {
             try {
-                const res = await fetch('/api/agent/status');
+                const res = await apiFetch('/api/agent/status');
                 const data = await res.json();
                 const badge = document.getElementById('agentBadge');
                 if (!data.enabled) {
@@ -1002,10 +2384,44 @@
             } catch (e) {}
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        async function syncSystemState() {
+            try {
+                const res = await apiFetch('/api/system/status');
+                const data = await res.json();
+                systemRunning = Boolean(data.running);
+                cameraActive = Boolean(data.camera_active);
+                videoActive = Boolean(data.video_active);
+                videoPaused = Boolean(data.video_paused);
+                currentSpeed = Number(data.video_speed || 1.0);
+                updateUI();
+
+                const controls = document.getElementById('videoControls');
+                if (videoActive) {
+                    controls.style.display = 'grid';
+                    document.getElementById('videoFeed').src = refreshedVideoFeedUrl();
+                    document.getElementById('btnPause').textContent = videoPaused ? '播放' : '暂停';
+                    showVideoFeed();
+                } else if (cameraActive) {
+                    controls.style.display = 'none';
+                    showVideoFeed();
+                } else {
+                    controls.style.display = 'none';
+                    hideVideoFeed();
+                }
+                await updateStatus();
+                if (systemRunning) {
+                    startStatusPolling();
+                } else {
+                    stopStatusPolling();
+                }
+            } catch (e) {}
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
             updateUI();
             updateAgentStatus();
             applyOverlay();
+            await syncSystemState();
             setInterval(updateAgentStatus, 3000);
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('/sw.js').catch(() => {});

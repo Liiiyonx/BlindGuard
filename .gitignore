@@ -42,3 +42,6 @@ evaluation/dataset/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Claude Code 本地会话数据
+.claude/

@@ -24,11 +24,124 @@ BlindGuard 答辩指标评测脚本
 import os
 import sys
 import time
+import hashlib
 import argparse
 import statistics
 from datetime import datetime
 
 REPORT_PATH = os.path.join('evaluation', 'metrics_report.md')
+
+
+def _sha256(path, chunk_size=1024 * 1024):
+    """Return a stable fingerprint for a model artifact."""
+    digest = hashlib.sha256()
+    with open(path, 'rb') as handle:
+        while True:
+            chunk = handle.read(chunk_size)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _model_report_lines(config, model_paths):
+    """Describe the exact model artifacts and inference settings under test."""
+    model_cfg = config.get_section('model')
+    lines = [
+        f"- 配置文件: `{config.config_path.resolve()}`",
+        f"- 推理设备: `{model_cfg.get('device') or 'auto'}`",
+        f"- 置信度阈值: {model_cfg.get('confidence_threshold', 0.5)}，"
+        f"IoU 阈值: {model_cfg.get('iou_threshold', 0.45)}",
+        f"- 主模型输入: {model_cfg.get('img_size', 640)}，"
+        f"辅助模型输入: {model_cfg.get('aux_img_size', 640)}",
+        f"- 竖屏中心裁剪: {bool(model_cfg.get('portrait_crop', False))}",
+    ]
+    for role, path in model_paths:
+        if path.is_file():
+            lines.append(f"- {role}: `{path}`，SHA256 `{_sha256(path)}`")
+        else:
+            lines.append(f"- {role}: `{path}`（文件不存在）")
+    return lines
+
+
+def _build_production_pipeline(config):
+    """Construct the same detector stack used by the web application."""
+    from core.detection_engine import DetectionEngine
+    from core.model_validation import model_paths_for_report, resolve_config_relative_path
+    from core.pipeline import DetectionPipeline, class_ids_for
+    from core.risk_evaluator import RiskEvaluator
+    from core.scene_analyzer import SceneAnalyzer
+    from core.tracker import SimpleTracker
+    from core.traffic_light import TrafficLightClassifier
+
+    model_cfg = config.get_section('model')
+    class_mapping = config.get('class_mapping', {}) or {}
+    main_path = resolve_config_relative_path(
+        str(model_cfg.get('path', 'best_s.pt')), str(config.config_path))
+    detector = DetectionEngine(
+        model_path=str(main_path),
+        confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
+        iou_threshold=model_cfg.get('iou_threshold', 0.45),
+        device=model_cfg.get('device', ''),
+        img_size=model_cfg.get('img_size', 640),
+    )
+    focus_ids = class_ids_for(detector, model_cfg.get('focus_classes') or [])
+
+    aux_detector = None
+    aux_ids = None
+    aux_path_value = str(model_cfg.get('aux_model_path') or '').strip()
+    if aux_path_value:
+        aux_path = resolve_config_relative_path(aux_path_value, str(config.config_path))
+        aux_detector = DetectionEngine(
+            model_path=str(aux_path),
+            confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
+            iou_threshold=model_cfg.get('iou_threshold', 0.45),
+            device=model_cfg.get('device', ''),
+            img_size=model_cfg.get('aux_img_size', 640),
+        )
+        aux_ids = class_ids_for(aux_detector, model_cfg.get('aux_classes') or [])
+
+    risk_cfg = config.get_section('risk')
+    risk = RiskEvaluator(
+        risk_thresholds={'distance': risk_cfg.get('thresholds', {})},
+        high_risk_classes=risk_cfg.get('high_risk_classes'),
+        medium_risk_classes=risk_cfg.get('medium_risk_classes'),
+        low_risk_classes=risk_cfg.get('low_risk_classes'),
+        class_mapping=class_mapping,
+    )
+    pipeline = DetectionPipeline(
+        detector=detector,
+        aux_detector=aux_detector,
+        focus_class_ids=focus_ids,
+        aux_class_ids=aux_ids,
+        portrait_crop=bool(model_cfg.get('portrait_crop', False)),
+        risk_evaluator=risk,
+        scene_analyzer=SceneAnalyzer(class_mapping=class_mapping),
+        tracker=SimpleTracker(),
+        light_classifier=TrafficLightClassifier(),
+        class_mapping=class_mapping,
+    )
+    return pipeline, risk, model_paths_for_report(config)
+
+
+def _build_configured_detector(config_path='config.yaml'):
+    """Build the primary detector with config-relative model path resolution."""
+    from core.config_manager import ConfigManager
+    from core.detection_engine import DetectionEngine
+    from core.model_validation import resolve_config_relative_path
+
+    config = ConfigManager(config_path)
+    model_cfg = config.get_section('model')
+    model_path = resolve_config_relative_path(
+        str(model_cfg.get('path', 'best_s.pt')), str(config.config_path))
+    detector = DetectionEngine(
+        model_path=str(model_path),
+        confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
+        iou_threshold=model_cfg.get('iou_threshold', 0.45),
+        device=model_cfg.get('device', ''),
+        img_size=model_cfg.get('img_size', 640),
+    )
+    return detector
 
 
 def _append_report(title, lines):
@@ -64,38 +177,12 @@ def _fmt_stats(values, unit='ms', nd=1):
 
 def cmd_perf(args):
     import cv2
-    import numpy as np
     from core.config_manager import ConfigManager
-    from core.detection_engine import DetectionEngine
-    from core.risk_evaluator import RiskEvaluator
-    from core.scene_analyzer import SceneAnalyzer
-    from core.tracker import SimpleTracker
-    from core.traffic_light import TrafficLightClassifier
     from core.agent import BlindGuardAgent
-    from core.labels import get_class_cn
 
     cfg = ConfigManager('config.yaml')
-    model_cfg = cfg.get_section('model')
-    risk_cfg = cfg.get_section('risk')
     class_mapping = cfg.get('class_mapping', {}) or {}
-
-    detector = DetectionEngine(
-        model_path=model_cfg.get('path', 'best.pt'),
-        confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
-        iou_threshold=model_cfg.get('iou_threshold', 0.45),
-        device=model_cfg.get('device', ''),
-        img_size=model_cfg.get('img_size', 640),
-    )
-    risk = RiskEvaluator(
-        risk_thresholds={'distance': risk_cfg.get('thresholds', {})},
-        high_risk_classes=risk_cfg.get('high_risk_classes'),
-        medium_risk_classes=risk_cfg.get('medium_risk_classes'),
-        low_risk_classes=risk_cfg.get('low_risk_classes'),
-        class_mapping=class_mapping,
-    )
-    scene = SceneAnalyzer(class_mapping=class_mapping)
-    tracker = SimpleTracker()
-    light_clf = TrafficLightClassifier()
+    pipeline, _, model_paths = _build_production_pipeline(cfg)
 
     # 模板播报路径计时（排除 LLM 网络波动；LLM 通常增加 1-3s，另行说明）
     agent_cfg = cfg.get_section('agent')
@@ -115,7 +202,9 @@ def cmd_perf(args):
     except ImportError:
         print("[提示] 未安装 psutil，跳过 CPU/内存采样（pip install psutil）")
 
-    t_detect, t_light, t_track, t_risk, t_scene, t_encode = [], [], [], [], [], []
+    t_crop, t_main, t_aux = [], [], []
+    t_light, t_track, t_risk, t_scene, t_encode = [], [], [], [], []
+    t_total, t_pipeline = [], []
     t_announce = []
     frame_count = 0
     total_target = args.frames
@@ -130,34 +219,15 @@ def cmd_perf(args):
             if not ret:
                 break
 
-        t0 = time.perf_counter()
-        detections = detector.detect(frame)
-        t1 = time.perf_counter()
+        pipeline_result = pipeline.process(frame)
+        timings = pipeline_result['timings']
+        enriched = pipeline_result['detections']
+        overall = pipeline_result['overall']
+        fw, fh = pipeline_result['frame_size']
 
-        for d in detections:
-            if d.get('class_name') in ('traffic_light', 'traffic light'):
-                d['light_state'] = light_clf.classify(frame, d.get('bbox'))['state']
-        t2 = time.perf_counter()
-
-        tracker.update(detections)
-        t3 = time.perf_counter()
-
-        fh, fw = frame.shape[:2]
-        risk_results = risk.evaluate(detections, frame_width=fw)
-        overall = risk.get_overall_risk(risk_results)
-        t4 = time.perf_counter()
-
-        scene.analyze(frame, detections)
-        t5 = time.perf_counter()
-
+        encode_started = time.perf_counter()
         _, jpg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-        t6 = time.perf_counter()
-
-        enriched = []
-        for r in risk_results:
-            det = dict(r)
-            det['class_name_cn'] = get_class_cn(det['class_name'], class_mapping)
-            enriched.append(det)
+        encode_ms = (time.perf_counter() - encode_started) * 1000
 
         # 播报延迟采样（最多 8 次，避免拉长评测时间）
         announce_dets = agent.should_announce(enriched)
@@ -171,12 +241,16 @@ def cmd_perf(args):
             cpu_samples.append(psutil.cpu_percent(interval=None))
             mem_samples.append(psutil.memory_info().rss / (1024 * 1024))
 
-        t_detect.append((t1 - t0) * 1000)
-        t_light.append((t2 - t1) * 1000)
-        t_track.append((t3 - t2) * 1000)
-        t_risk.append((t4 - t3) * 1000)
-        t_scene.append((t5 - t4) * 1000)
-        t_encode.append((t6 - t5) * 1000)
+        t_crop.append(timings['crop_ms'])
+        t_main.append(timings['main_detect_ms'])
+        t_aux.append(timings['aux_detect_ms'])
+        t_light.append(timings['light_ms'])
+        t_track.append(timings['track_ms'])
+        t_risk.append(timings['risk_ms'])
+        t_scene.append(timings['scene_ms'])
+        t_total.append(timings['total_ms'])
+        t_pipeline.append(timings['total_ms'] + encode_ms)
+        t_encode.append(encode_ms)
         frame_count += 1
 
         if frame_count % 50 == 0:
@@ -185,15 +259,18 @@ def cmd_perf(args):
     total_s = time.perf_counter() - t_start
     cap.release()
 
-    full_pipeline = [a + b + c + d + e + g for a, b, c, d, e, g in
-                     zip(t_detect, t_light, t_track, t_risk, t_scene, t_encode)]
     fps_measured = frame_count / total_s if total_s > 0 else 0
 
-    lines = [
+    lines = _model_report_lines(cfg, model_paths) + [
         f"- 视频源: `{args.source}`，评测帧数: {frame_count}",
         f"- **实测处理帧率: {fps_measured:.1f} FPS**（不含人为节流）",
-        f"- 单帧完整管线耗时: {_fmt_stats(full_pipeline)}",
-        f"- 目标检测: {_fmt_stats(t_detect)}",
+        "- 说明: 历史报告中的 10.4 FPS 是旧版单模型 CPU 基线，"
+        "不代表当前主辅模型/设备配置的性能。",
+        f"- 共享生产管线耗时: {_fmt_stats(t_total)}",
+        f"- 管线 + JPEG 编码: {_fmt_stats(t_pipeline)}",
+        f"- 竖屏裁剪与坐标回映: {_fmt_stats(t_crop, nd=2)}",
+        f"- 主模型检测: {_fmt_stats(t_main)}",
+        f"- 辅助模型检测: {_fmt_stats(t_aux)}",
         f"- 红绿灯状态识别: {_fmt_stats(t_light, nd=2)}",
         f"- 目标跟踪: {_fmt_stats(t_track, nd=2)}",
         f"- 风险评估: {_fmt_stats(t_risk, nd=2)}",
@@ -240,15 +317,23 @@ names:
     except ImportError:
         from ultralytics import YOLO as YOLOModel
     from core.config_manager import ConfigManager
+    from core.model_validation import resolve_config_relative_path
 
-    model_path = ConfigManager('config.yaml').get('model.path', 'best.pt')
-    print(f"加载模型: {model_path}，评测数据: {args.data}")
-    model = YOLOModel(model_path)
-    metrics = model.val(data=args.data, imgsz=640, verbose=False)
+    config = ConfigManager('config.yaml')
+    model_cfg = config.get_section('model')
+    model_path = resolve_config_relative_path(
+        str(model_cfg.get('path', 'best_s.pt')), str(config.config_path))
+    imgsz = int(args.imgsz or model_cfg.get('img_size', 640))
+    print(f"加载模型: {model_path}，评测数据: {args.data}，imgsz={imgsz}")
+    model = YOLOModel(str(model_path))
+    metrics = model.val(data=args.data, imgsz=imgsz, verbose=False)
 
     box = metrics.box
     lines = [
-        f"- 模型: `{model_path}`，测试集: `{args.data}`",
+        f"- 模型: `{model_path}`",
+        f"- 模型 SHA256: `{_sha256(model_path)}`",
+        f"- 测试集: `{args.data}`，imgsz: {imgsz}",
+        f"- 推理设备: `{model_cfg.get('device') or 'auto'}`",
         f"- **mAP@0.5: {box.map50 * 100:.1f}**",
         f"- **mAP@0.5:0.95: {box.map * 100:.1f}**",
         "",
@@ -343,16 +428,8 @@ def cmd_light(args):
 
 def cmd_bootstrap(args):
     import cv2
-    from core.config_manager import ConfigManager
-    from core.detection_engine import DetectionEngine
 
-    model_cfg = ConfigManager('config.yaml').get_section('model')
-    detector = DetectionEngine(
-        model_path=model_cfg.get('path', 'best.pt'),
-        confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
-        iou_threshold=model_cfg.get('iou_threshold', 0.45),
-        img_size=model_cfg.get('img_size', 640),
-    )
+    detector = _build_configured_detector()
 
     img_dir = os.path.join('evaluation', 'dataset', 'images')
     lbl_dir = os.path.join('evaluation', 'dataset', 'labels')
@@ -411,16 +488,8 @@ def cmd_collect(args):
     """
     import cv2
     import json
-    from core.config_manager import ConfigManager
-    from core.detection_engine import DetectionEngine
 
-    model_cfg = ConfigManager('config.yaml').get_section('model')
-    detector = DetectionEngine(
-        model_path=model_cfg.get('path', 'best.pt'),
-        confidence_threshold=model_cfg.get('confidence_threshold', 0.5),
-        iou_threshold=model_cfg.get('iou_threshold', 0.45),
-        img_size=model_cfg.get('img_size', 640),
-    )
+    detector = _build_configured_detector()
 
     spot_dir = os.path.join('evaluation', 'spotcheck')
     crop_dir = os.path.join('evaluation', 'light_crops')
@@ -492,6 +561,8 @@ def main():
 
     p = sub.add_parser('accuracy', help='模型精度 mAP（需 YOLO 格式测试集）')
     p.add_argument('--data', required=True, help='data yaml 路径')
+    p.add_argument('--imgsz', type=int, default=None,
+                   help='验证输入尺寸，默认读取 config.yaml 的主模型 img_size')
     p.set_defaults(func=cmd_accuracy)
 
     p = sub.add_parser('light', help='红绿灯识别准确率')

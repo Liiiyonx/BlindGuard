@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lightweight-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Install lightweight test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements-ci.txt
+
+      - name: Compile Python sources
+        run: python -m compileall -q app.py run.py evaluate.py smoke_test.py test_agent_tools.py build_dataset_v5.py core tests
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
