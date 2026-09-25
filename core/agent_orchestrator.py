@@ -882,6 +882,7 @@ class AgentOrchestrator:
         detail = self.agent._preferences().get(
             "announce_detail", "concise"
         )
+        path = "deterministic"
         if (
             not self.agent.llm_ok
             or safety_policy.should_use_local_announcement(
@@ -889,7 +890,12 @@ class AgentOrchestrator:
             )
         ):
             text = self.agent._fallback_announce(detections, frame_w)
-            path = "deterministic"
+        elif self.agent._user_request_active():
+            # 用户提问优先：让出 LLM 端点，改用本地模板播报。
+            # 否则播报会排在用户问题前面，实测把回答从数秒拖到十余秒。
+            # 注意安全类播报（红灯/高风险）本就走上一个分支的本地模板，不受影响。
+            text = self.agent._fallback_announce(detections, frame_w)
+            path = "yielded_to_user"
         else:
             text = self.agent._llm_announce(
                 detections, risk_level, frame_w, detail

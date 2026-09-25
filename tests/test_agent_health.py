@@ -42,8 +42,9 @@ class AgentHealthTests(unittest.TestCase):
                 body,
             )
 
-        with patch(
-            'core.agent.urllib.request.urlopen',
+        with patch.object(
+            agent,
+            '_urlopen',
             side_effect=raise_payment_required,
         ):
             reply = agent.chat('周围有什么？', [])
@@ -75,7 +76,7 @@ class AgentHealthTests(unittest.TestCase):
                     'choices': [{'message': {'content': '模型已恢复'}}],
                 }).encode('utf-8')
 
-        with patch('core.agent.urllib.request.urlopen', return_value=Response()):
+        with patch.object(agent, '_urlopen', return_value=Response()):
             message = agent._call_llm([{'role': 'user', 'content': 'test'}])
 
         self.assertEqual(message['content'], '模型已恢复')

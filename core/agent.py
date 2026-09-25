@@ -166,6 +166,16 @@ class BlindGuardAgent:
         self.model = llm.get('model') or 'deepseek-chat'
         self.temperature = float(llm.get('temperature', 0.6))
         self.timeout = float(llm.get('timeout', 8))
+        # 系统代理默认关闭：本机代理客户端会让每次 LLM 调用多花 6-10 秒
+        # （实测同一端点 6.9s/11.6s → 直连 0.99s/1.61s）。需要经代理出网的环境
+        # 在 config.yaml 把 agent.llm.use_proxy 设为 true。
+        self.use_proxy = bool(llm.get('use_proxy', False))
+        if self.use_proxy:
+            self._urlopen = urllib.request.urlopen
+        else:
+            self._urlopen = urllib.request.build_opener(
+                urllib.request.ProxyHandler({})
+            ).open
 
         # 多模态看图（可选）：独立的 OpenAI 兼容视觉端点
         vis = config.get('vision', {}) or {}
@@ -1163,6 +1173,13 @@ class BlindGuardAgent:
             self.temperature if temperature is None else float(temperature)
         )
         use_tools = bool(tools) and self.tools_supported
+        # 调用耗时与请求体积：定位"回答要等十几秒"是端点慢还是请求太大
+        call_started = time.time()
+        prompt_chars = sum(
+            len(str(item.get('content') or '')) for item in messages
+        )
+        if use_tools:
+            prompt_chars += len(json.dumps(tools, ensure_ascii=False))
         for _ in range(2):
             payload = {
                 'model': self.model,
@@ -1183,13 +1200,23 @@ class BlindGuardAgent:
                 },
             )
             try:
-                with urllib.request.urlopen(req, timeout=request_timeout) as r:
+                with self._urlopen(req, timeout=request_timeout) as r:
                     body = json.loads(r.read().decode('utf-8'))
                 msg = body['choices'][0]['message'] or {}
                 self._fail_count = 0  # 调用成功，重置熔断计数
                 self._llm_degraded = False
                 self._last_error = ''
                 return_msg = msg if isinstance(msg, dict) else {'content': str(msg)}
+                logger.info(
+                    "LLM 调用完成: %.0fms（请求 %d 字符，tools=%s，"
+                    "max_tokens=%d，prompt=%s，completion=%s）",
+                    (time.time() - call_started) * 1000,
+                    prompt_chars,
+                    use_tools,
+                    max_tokens,
+                    (body.get('usage') or {}).get('prompt_tokens'),
+                    (body.get('usage') or {}).get('completion_tokens'),
+                )
                 return return_msg
             except urllib.error.HTTPError as e:
                 detail = ''
@@ -1296,6 +1323,17 @@ class BlindGuardAgent:
             except Exception as e:
                 logger.warning(f"读取检测健康状态失败: {e}")
         return None
+
+    def _user_request_active(self) -> bool:
+        """是否有用户提问正在进行；上下文未提供时返回 False（不抑制播报）"""
+        if self.context is not None and hasattr(
+            self.context, 'is_user_request_active'
+        ):
+            try:
+                return bool(self.context.is_user_request_active())
+            except Exception as e:
+                logger.warning(f"读取用户请求状态失败: {e}")
+        return False
 
     def _detection_health_warning(self) -> str:
         """推理异常时的提示前缀；健康时返回空串。

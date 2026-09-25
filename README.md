@@ -346,6 +346,8 @@ curl -H "Authorization: Bearer $BLINDGUARD_SERVER_TOKEN" http://127.0.0.1:5000/a
 - 修复状态接口无锁读取事件时间线的并发缺陷（前端 500ms 轮询与追加并发时会抛 `deque mutated during iteration`）
 - 趋势判定改为取最接近回看窗口的样本：原实现取最早满足者，帧率稀疏时会与远早于窗口的样本比较而误判接近；同时移除名不副实的 `conf_smooth` 兼容字段（前端早已优先使用 `conf_stable`）
 - 统一 `risk.thresholds` 的形状（此前 `DEFAULT_CONFIG` 与转换器/消费方不一致）并接通 `risk.class_scores` 类别分值覆盖
+- **修复 LLM 调用被本机系统代理拖慢**：`urllib` 默认读取 Windows 代理设置，实测每次调用多花 6-10 秒（主动播报延迟 6-12 秒、问答 6-17 秒）。新增 `agent.llm.use_proxy`（默认 `false`）走直连，实测调用降到 0.9-1.6 秒
+- 用户提问期间主动播报改用本地模板让出 LLM 端点，播报历史如实记录 `yielded_to_user`，避免把回答排在播报后面
 
 ### V2.4.0 (2026)
 - 智能体升级为“编排式专业能力 + 确定性安全守门员”：10 个角色声明职责、权限边界与首选工具，角色目录可通过状态接口和能力工具查询

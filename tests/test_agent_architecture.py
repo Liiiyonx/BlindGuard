@@ -6,6 +6,7 @@ import os
 import tempfile
 import time
 import unittest
+import urllib.request
 
 from core.agent import AGENT_TOOLS, BlindGuardAgent
 from core.agent_orchestrator import IntentRouter, assess_announcement
@@ -18,10 +19,14 @@ class FakeContext:
     def __init__(self):
         self.detections = []
         self.risk = "safe"
+        self.user_request_active = False
         self.preferences = {
             "voice_rate": 180,
             "announce_detail": "concise",
         }
+
+    def is_user_request_active(self):
+        return self.user_request_active
 
     def get_detections(self):
         return list(self.detections)
@@ -66,6 +71,22 @@ def car(track_id=7, trend="approaching", risk="high"):
 
 
 class AgentToolRegistryTests(unittest.TestCase):
+    def test_llm_bypasses_system_proxy_by_default(self):
+        # 本机系统代理会给每次 LLM 调用加 6-10 秒，默认必须直连
+        agent = BlindGuardAgent({"enabled": True})
+
+        self.assertFalse(agent.use_proxy)
+        self.assertIsNot(agent._urlopen, urllib.request.urlopen)
+
+    def test_llm_can_opt_into_system_proxy(self):
+        agent = BlindGuardAgent({
+            "enabled": True,
+            "llm": {"use_proxy": True},
+        })
+
+        self.assertTrue(agent.use_proxy)
+        self.assertIs(agent._urlopen, urllib.request.urlopen)
+
     def test_all_declarations_are_unique_and_registered(self):
         agent = BlindGuardAgent({"enabled": True})
 
@@ -681,6 +702,59 @@ class AgentOrchestrationTests(unittest.TestCase):
             "红灯" in reason
             for reason in history["announcements"][0]["reasons"]
         ))
+
+    @staticmethod
+    def _llm_ready_agent(context):
+        """LLM 可用且拦截真实调用的 Agent，返回 (agent, 调用记录)"""
+        agent = BlindGuardAgent({
+            "enabled": True,
+            "llm": {
+                "base_url": "http://127.0.0.1:9/v1",
+                "api_key": "test-key",
+                "model": "test-model",
+            },
+        })
+        agent.set_context(context)
+        calls = []
+
+        def fake_call(messages, **kwargs):
+            calls.append(kwargs)
+            return {"content": "模型生成的播报"}
+
+        agent._call_llm = fake_call
+        return agent, calls
+
+    def test_announcement_uses_llm_when_no_user_request(self):
+        # 中风险、无红黄灯 → 走模型播报（高风险/红黄灯本就本地模板，不在此列）
+        agent, calls = self._llm_ready_agent(FakeContext())
+
+        announcement = agent.generate_announcement(
+            [car(risk="medium")], "medium")
+        history = json.loads(
+            agent._execute_tool("get_announcement_history", "{}")
+        )
+
+        self.assertEqual(len(calls), 1)
+        self.assertIn("模型生成的播报", announcement)
+        self.assertEqual(history["announcements"][0]["path"], "llm")
+
+    def test_announcement_yields_llm_endpoint_while_user_asks(self):
+        context = FakeContext()
+        context.user_request_active = True
+        agent, calls = self._llm_ready_agent(context)
+
+        announcement = agent.generate_announcement(
+            [car(risk="medium")], "medium")
+        history = json.loads(
+            agent._execute_tool("get_announcement_history", "{}")
+        )
+
+        # 提问期间不占用 LLM 端点，改用本地模板，并如实记录让出原因
+        self.assertEqual(calls, [])
+        self.assertTrue(announcement)
+        self.assertEqual(
+            history["announcements"][0]["path"], "yielded_to_user"
+        )
 
     def test_intent_router_and_urgency_are_explainable(self):
         router = IntentRouter()

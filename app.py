@@ -264,6 +264,8 @@ class BlindGuardApp:
         # 播报生成并发控制，避免 LLM 调用堆积
         self._generating = False
         self._runtime_generation = 0
+        # 用户提问进行中的计数：主动播报据此让出 LLM 端点，避免把回答排队
+        self._active_chats = 0
         # 分析状态提交与代际切换使用同一把锁，避免停止视频/摄像头后旧帧回写
         self._runtime_lock = threading.RLock()
         # 最近一条播报，供前端展示
@@ -365,6 +367,10 @@ class BlindGuardApp:
             'degraded': any(h['degraded'] for h in healths),
             'engines': healths,
         }
+
+    def is_user_request_active(self):
+        """是否有用户提问正在进行（供智能体决定主动播报是否让出 LLM 端点）"""
+        return self._active_chats > 0
 
     def get_scene(self):
         """瘦身的场景信息（剔除重量级 detections 列表）"""
@@ -850,6 +856,9 @@ class BlindGuardApp:
             dets = list(self.detections)
         risk = self.overall_risk
         frame_w, frame_h = self._frame_size
+        # 提问期间置位，让主动播报改用本地模板、不去抢同一个 LLM 端点
+        with self._runtime_lock:
+            self._active_chats += 1
         try:
             reply = self.agent.chat(question, dets, risk, frame_w, frame_h)
             logger.info(f"用户问: {question} | Agent答: {reply}")
@@ -863,6 +872,9 @@ class BlindGuardApp:
         except Exception as e:
             logger.error(f"对话异常: {e}")
             return jsonify({'success': False, 'message': f'对话失败: {e}'})
+        finally:
+            with self._runtime_lock:
+                self._active_chats -= 1
 
     def _agent_status(self):
         status = self.agent.status()

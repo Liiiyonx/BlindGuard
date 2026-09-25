@@ -54,7 +54,8 @@ class ConfigManager:
                 'api_key': '',
                 'model': 'deepseek-chat',
                 'temperature': 0.6,
-                'timeout': 8
+                'timeout': 8,
+                'use_proxy': False,
             },
             'vision': {
                 'base_url': '',

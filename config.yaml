@@ -115,6 +115,9 @@ agent:
     model: "deepseek-chat"  # 模型名
     temperature: 0.6        # 采样温度
     timeout: 8              # 请求超时（秒）
+    use_proxy: false        # 是否走系统代理。默认 false：本机代理客户端会给每次调用
+                            # 增加 6-10 秒（实测 6.9s/11.6s → 直连 0.99s/1.61s）。
+                            # 仅在必须经代理才能访问该端点时才设为 true。
   vision:                   # 可选：多模态视觉端点（Agent 的"看图"工具 look_at_frame）
     base_url: ""            # 如 "https://open.bigmodel.cn/api/paas/v4"
     api_key: ""             # 留空！或环境变量 BLINDGUARD_AGENT_VISION_API_KEY
