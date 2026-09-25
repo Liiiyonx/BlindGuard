@@ -915,7 +915,7 @@
         }
 
         .chat-box {
-            max-height: 200px;
+            max-height: 460px;
             margin-bottom: 10px;
             padding: 12px;
         }
@@ -1397,7 +1397,7 @@
             }
 
             .chat-box {
-                max-height: 170px;
+                max-height: 340px;
             }
 
             .detection-list {
@@ -1414,6 +1414,360 @@
                 animation-duration: 0.01ms !important;
                 animation-iteration-count: 1 !important;
             }
+        }
+
+        /* 智能体驾驶舱：角色目录、工具权限台账与调用审计（按需拉取） */
+        .cockpit-toggle {
+            width: 100%;
+            min-height: 44px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .cockpit-body[hidden] { display: none; }
+
+        .cockpit-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .cockpit-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(0, 122, 255, 0.10);
+            color: #0a4d9e;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .cockpit-chip.alert {
+            background: rgba(255, 59, 48, 0.14);
+            color: #a1221a;
+        }
+
+        .cockpit-section { margin-top: 12px; }
+
+        .cockpit-section-title {
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .cockpit-roles {
+            display: grid;
+            gap: 8px;
+        }
+
+        .cockpit-role {
+            padding: 8px 10px;
+            border: 1px solid var(--ios-separator);
+            border-radius: 8px;
+        }
+
+        .cockpit-role-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cockpit-role-name {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .cockpit-role-desc,
+        .cockpit-role-authority {
+            margin-top: 3px;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .cockpit-role-desc { color: #6b7280; }
+        .cockpit-role-authority { color: #8a4b00; }
+
+        .cockpit-tool {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--ios-separator);
+            font-size: 12px;
+        }
+
+        .cockpit-tool:last-child { border-bottom: none; }
+
+        .cockpit-tool-name {
+            flex: 1 1 130px;
+            overflow-wrap: anywhere;
+        }
+
+        .cockpit-tag {
+            padding: 1px 6px;
+            border-radius: 999px;
+            background: rgba(60, 60, 67, 0.10);
+            font-size: 11px;
+            white-space: nowrap;
+        }
+
+        .cockpit-tag.write {
+            background: rgba(255, 149, 0, 0.18);
+            color: #8a4b00;
+        }
+
+        .cockpit-tag.external {
+            background: rgba(255, 59, 48, 0.16);
+            color: #a1221a;
+        }
+
+        .cockpit-audit { display: grid; gap: 5px; }
+
+        .cockpit-audit-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .cockpit-empty {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        body.hc .cockpit-chip {
+            background: #2c2c2e !important;
+            color: #64d2ff !important;
+        }
+
+        body.hc .cockpit-chip.alert {
+            color: #ff453a !important;
+        }
+
+        body.hc .cockpit-role {
+            border-color: #8e8e93 !important;
+        }
+
+        body.hc .cockpit-role-name,
+        body.hc .cockpit-tool,
+        body.hc .cockpit-audit-row { color: #ffffff !important; }
+
+        body.hc .cockpit-role-desc,
+        body.hc .cockpit-empty { color: #d1d1d6 !important; }
+
+        body.hc .cockpit-role-authority { color: #ffd60a !important; }
+
+        body.hc .cockpit-tag {
+            background: #2c2c2e !important;
+            color: #ffffff !important;
+        }
+
+        body.hc .cockpit-tag.write,
+        body.hc .cockpit-tag.external { color: #ffd60a !important; }
+
+        body.hc .cockpit-tool { border-bottom-color: #8e8e93; }
+
+        /* 智能体编排链路证据：全部静态骨架 + textContent 写入，不注入动态 HTML */
+        .trace {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(60, 60, 67, 0.18);
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: normal;
+            text-align: left;
+        }
+
+        .trace-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 8px;
+        }
+
+        .trace-title {
+            font-weight: 600;
+        }
+
+        .trace-chip,
+        .trace-stage,
+        .trace-flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(60, 60, 67, 0.09);
+            color: inherit;
+            white-space: nowrap;
+        }
+
+        .trace-stages {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 8px 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .trace-stage::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #8e8e93;
+            flex: 0 0 auto;
+        }
+
+        .trace-stage.completed::before { background: #34c759; }
+        .trace-stage.bypassed::before { background: #ff9f0a; }
+        .trace-stage.blocked::before { background: #ff453a; }
+        .trace-stage.skipped,
+        .trace-stage.not_required { opacity: 0.62; }
+
+        .trace-toggle {
+            width: 100%;
+            min-height: 44px;
+            margin-top: 8px;
+            padding: 6px 10px;
+            border: 1px solid rgba(60, 60, 67, 0.22);
+            border-radius: 10px;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            font-size: 13px;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .trace-toggle:hover {
+            border-color: currentColor;
+        }
+
+        .trace-toggle:focus-visible {
+            outline: 3px solid var(--ios-blue);
+            outline-offset: 2px;
+        }
+
+        .trace-detail[hidden] { display: none; }
+
+        .trace-section { margin-top: 10px; }
+
+        .trace-section-title {
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .trace-list {
+            display: grid;
+            gap: 6px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .trace-item {
+            padding: 6px 8px;
+            border-radius: 10px;
+            background: rgba(60, 60, 67, 0.06);
+        }
+
+        .trace-item-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px 6px;
+        }
+
+        .trace-name { font-weight: 600; }
+
+        .trace-note {
+            margin-top: 2px;
+            opacity: 0.85;
+            white-space: pre-wrap;
+        }
+
+        .trace-safety {
+            margin-top: 10px;
+            padding: 8px;
+            border: 1px solid rgba(60, 60, 67, 0.22);
+            border-radius: 10px;
+            background: rgba(60, 60, 67, 0.05);
+        }
+
+        .trace-safety.rewritten {
+            border-color: #ff9f0a;
+            background: rgba(255, 159, 10, 0.14);
+        }
+
+        .trace-quote {
+            margin-top: 4px;
+            padding: 6px 8px;
+            border-left: 3px solid #8e8e93;
+            border-radius: 8px;
+            background: rgba(60, 60, 67, 0.08);
+            white-space: pre-wrap;
+        }
+
+        .trace-quote.is-raw { border-left-color: #8e8e93; opacity: 0.9; }
+
+        .trace-quote.is-added {
+            border-left-color: #ff9f0a;
+            background: rgba(255, 159, 10, 0.18);
+            font-weight: 600;
+        }
+
+        .trace-quote.is-final { border-left-color: #34c759; }
+
+        body.hc .trace {
+            border-top-color: #8e8e93;
+            font-size: 16px;
+        }
+
+        /* 大字模式字号变大，链路整体更高；对话区同步放宽，避免评委要滚动才能看完 */
+        body.hc .chat-box {
+            max-height: 560px;
+        }
+
+        body.hc .trace-chip,
+        body.hc .trace-stage,
+        body.hc .trace-flag,
+        body.hc .trace-item,
+        body.hc .trace-quote,
+        body.hc .trace-safety {
+            background: #2c2c2e !important;
+            border-color: #8e8e93 !important;
+            color: #ffffff !important;
+        }
+
+        body.hc .trace-toggle {
+            min-height: 48px;
+            font-size: 16px;
+            border-color: #8e8e93;
+        }
+
+        body.hc .trace-safety.rewritten {
+            border-color: #ffd60a !important;
+            background: #3a2f00 !important;
+        }
+
+        body.hc .trace-quote.is-raw { border-left-color: #8e8e93; }
+
+        body.hc .trace-quote.is-added {
+            border-left-color: #ffd60a;
+            background: #4a3a00 !important;
+        }
+
+        body.hc .trace-quote.is-final { border-left-color: #30d158; }
+
+        @media (max-width: 600px) {
+            .trace-toggle { min-height: 48px; }
         }
     </style>
 </head>
@@ -1529,6 +1883,17 @@
             </div>
 
             <div class="panel-card">
+                <h3>智能体架构
+                    <span class="agent-badge off" id="cockpitBadge">未加载</span>
+                </h3>
+                <p class="safety-note" role="note">10 个角色各自声明职责与权限边界，13 个工具统一做参数校验、限时限权与调用审计；安全守门员可覆盖模型输出，但不能授权通行。</p>
+                <button class="btn btn-secondary cockpit-toggle" id="cockpitToggle" type="button"
+                        aria-expanded="false" aria-controls="cockpitBody"
+                        onclick="toggleCockpit()">展开角色与工具台账</button>
+                <div class="cockpit-body" id="cockpitBody" hidden></div>
+            </div>
+
+            <div class="panel-card">
                 <h3>智能对话
                     <span class="agent-badge off" id="agentBadge">本地回退</span>
                 </h3>
@@ -1563,6 +1928,7 @@
         let videoTotal = 0;
         let statusInterval = null;
         let chatRequestQueue = Promise.resolve();
+        let traceSeq = 0;
 
         function apiFetch(url, options = {}) {
             const requestOptions = { ...options };
@@ -2325,7 +2691,8 @@
                     const reply = data.success
                         ? data.reply
                         : '抱歉，出错了：' + data.message;
-                    replaceChatMessage(pending, 'bot', reply);
+                    replaceChatMessage(pending, 'bot', reply, data.orchestration);
+                    if (cockpitExpanded) loadCockpit();
                 } catch (e) {
                     replaceChatMessage(pending, 'bot', '网络错误：' + e.message);
                 }
@@ -2348,7 +2715,7 @@
             return div;
         }
 
-        function replaceChatMessage(oldElement, role, text) {
+        function replaceChatMessage(oldElement, role, text, orchestration) {
             if (!oldElement || !oldElement.isConnected) return;
             const box = document.getElementById('chatBox');
             const div = document.createElement('div');
@@ -2359,8 +2726,251 @@
             roleEl.textContent = label;
             div.appendChild(roleEl);
             div.appendChild(document.createTextNode(text));
+            const trace = buildOrchestrationTrace(orchestration);
+            if (trace) div.appendChild(trace);
             oldElement.replaceWith(div);
             box.scrollTop = box.scrollHeight;
+        }
+
+        // 编排链路展示：把后端真实执行记录渲染成可核对的证据
+        const INTENT_LABELS = {
+            preference: '偏好调整',
+            capabilities: '能力查询',
+            system_health: '运行状态',
+            announcement_history: '播报历史',
+            vision: '画面细节',
+            memory_trend: '时序趋势',
+            environment: '环境描述',
+            general: '通用对话'
+        };
+        const STAGE_LABELS = {
+            routing: '意图路由',
+            prefetch: '本地预取',
+            specialists: '角色协作',
+            llm: '模型推理',
+            tool_loop: '工具循环',
+            safety_review: '安全复核'
+        };
+        const STAGE_STATUS_LABELS = {
+            completed: '已完成',
+            skipped: '本轮跳过',
+            bypassed: '绕过模型',
+            not_required: '无需执行',
+            blocked: '已拦截'
+        };
+        // 非「已完成」的阶段直接在胶囊里写清状态，避免只靠颜色圆点表达
+        const STAGE_STATUS_SHORT = {
+            skipped: '跳过',
+            bypassed: '绕过模型',
+            not_required: '无需',
+            blocked: '已拦截'
+        };
+        const PATH_LABELS = {
+            deterministic_safety: '确定性安全拦截',
+            local_control: '本地确定性执行',
+            local_fallback: '本地回退',
+            llm_context: '模型上下文',
+            llm_tool_loop: '模型工具循环'
+        };
+        const ROLE_STATUS_LABELS = {
+            completed: '已执行',
+            standby: '待命',
+            ready: '就绪',
+            degraded: '降级',
+            blocked: '已拦截'
+        };
+        const TOOL_PHASE_LABELS = {
+            prefetch: '预取',
+            specialist: '角色',
+            model: '模型'
+        };
+
+        function traceEl(tag, className, text) {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text !== undefined && text !== null && text !== '') {
+                node.textContent = String(text);
+            }
+            return node;
+        }
+
+        function buildToolList(tools) {
+            const section = traceEl('div', 'trace-section');
+            section.appendChild(traceEl(
+                'div', 'trace-section-title',
+                '工具轨迹（' + tools.length + '）'));
+            const list = traceEl('ul', 'trace-list');
+            tools.forEach((tool) => {
+                const item = traceEl('li', 'trace-item');
+                const head = traceEl('div', 'trace-item-head');
+                head.appendChild(traceEl(
+                    'span', 'trace-flag',
+                    TOOL_PHASE_LABELS[tool.phase] || tool.phase || '工具'));
+                head.appendChild(traceEl('span', 'trace-name', tool.name || ''));
+                head.appendChild(traceEl(
+                    'span', 'trace-chip', (tool.duration_ms || 0) + ' ms'));
+                if (tool.cache_hit) head.appendChild(traceEl('span', 'trace-flag', '缓存命中'));
+                if (tool.policy_denied) head.appendChild(traceEl('span', 'trace-flag', '策略拒绝'));
+                if (tool.success === false) head.appendChild(traceEl('span', 'trace-flag', '执行失败'));
+                item.appendChild(head);
+                list.appendChild(item);
+            });
+            section.appendChild(list);
+            return section;
+        }
+
+        function buildRoleList(roles) {
+            const section = traceEl('div', 'trace-section');
+            section.appendChild(traceEl(
+                'div', 'trace-section-title',
+                '角色协作结论（' + roles.length + '）'));
+            const list = traceEl('ul', 'trace-list');
+            roles.forEach((role) => {
+                const item = traceEl('li', 'trace-item');
+                const head = traceEl('div', 'trace-item-head');
+                head.appendChild(traceEl('span', 'trace-name', role.name || role.role || '角色'));
+                head.appendChild(traceEl(
+                    'span', 'trace-flag',
+                    ROLE_STATUS_LABELS[role.status] || role.status || ''));
+                if (role.tool) head.appendChild(traceEl('span', 'trace-chip', role.tool));
+                item.appendChild(head);
+                if (role.summary) item.appendChild(traceEl('div', 'trace-note', role.summary));
+                list.appendChild(item);
+            });
+            section.appendChild(list);
+            return section;
+        }
+
+        function buildSafetyReview(data) {
+            const safety = data.safety || {};
+            const rewritten = Boolean(safety.safety_rewritten);
+            const box = traceEl('div', 'trace-safety' + (rewritten ? ' rewritten' : ''));
+            box.appendChild(traceEl(
+                'div', 'trace-section-title',
+                rewritten ? '安全复核：模型回复已被确定性改写' : '安全复核：确定性守门员已通过'));
+
+            const flags = traceEl('div', 'trace-head');
+            flags.appendChild(traceEl(
+                'span', 'trace-flag',
+                '通行意图 ' + (safety.passage_intent ? '是' : '否')));
+            flags.appendChild(traceEl(
+                'span', 'trace-flag',
+                '守门员 ' + (safety.guard_triggered ? '已触发' : '未触发')));
+            flags.appendChild(traceEl(
+                'span', 'trace-flag',
+                '改写 ' + (rewritten ? '已发生' : '未发生')));
+            flags.appendChild(traceEl(
+                'span', 'trace-flag',
+                '二次复核 ' + (safety.idempotent ? '幂等' : '待确认')));
+            flags.appendChild(traceEl(
+                'span', 'trace-flag',
+                '返回 ' + (safety.guard_passed && !safety.final_reply_dangerous
+                    ? '无授权措辞' : '需人工复核')));
+            box.appendChild(flags);
+
+            if (!rewritten) return box;
+
+            // 只对比“改动”本身：最终文本已在上方气泡里，重复展示会让差异看不出来
+            const rawReply = String(data.raw_reply || '');
+            const appended = String(safety.appended || '').replace(/^[。！!]+/, '');
+            const appendedOnly = safety.action === 'disclaimer_appended' && Boolean(appended);
+
+            box.appendChild(traceEl(
+                'div', 'trace-note',
+                rawReply ? '模型原始回复（未返回给用户）' : '模型本轮没有返回内容'));
+            if (rawReply) {
+                box.appendChild(traceEl('div', 'trace-quote is-raw', rawReply));
+            }
+            if (appendedOnly) {
+                box.appendChild(traceEl('div', 'trace-note', '安全守门员追加的说明（原句保留）'));
+                box.appendChild(traceEl('div', 'trace-quote is-added', appended));
+            } else {
+                box.appendChild(traceEl('div', 'trace-note', '安全守门员改为确定性保守答复'));
+                box.appendChild(traceEl('div', 'trace-quote is-final', data.final_reply));
+            }
+            return box;
+        }
+
+        function buildOrchestrationTrace(data) {
+            if (!data || !Array.isArray(data.stages) || data.stages.length === 0) {
+                return null;
+            }
+            const wrap = traceEl('div', 'trace');
+
+            const head = traceEl('div', 'trace-head');
+            head.appendChild(traceEl('span', 'trace-title', '编排链路'));
+            const confidence = Math.round((data.intent_confidence || 0) * 100);
+            head.appendChild(traceEl(
+                'span', 'trace-chip',
+                '意图 ' + (INTENT_LABELS[data.intent] || data.intent || '通用对话')
+                + (confidence ? ' · ' + confidence + '%' : '')));
+            if (data.lead_role_name) {
+                head.appendChild(traceEl('span', 'trace-chip', '主责 ' + data.lead_role_name));
+            }
+            const pathLabel = PATH_LABELS[data.path] || data.path;
+            if (pathLabel) head.appendChild(traceEl('span', 'trace-chip', pathLabel));
+            if (data.used_local_fallback) {
+                head.appendChild(traceEl('span', 'trace-flag', '模型未应答，本地兜底'));
+            }
+            head.appendChild(traceEl('span', 'trace-chip', (data.duration_ms || 0) + ' ms'));
+            wrap.appendChild(head);
+
+            const stages = traceEl('ol', 'trace-stages');
+            data.stages.forEach((stage) => {
+                const status = stage.status || 'completed';
+                const label = STAGE_LABELS[stage.stage] || stage.stage || '';
+                const short = STAGE_STATUS_SHORT[status];
+                const item = traceEl(
+                    'li', 'trace-stage ' + status,
+                    short ? label + ' · ' + short : label);
+                item.title = label + '：' + (STAGE_STATUS_LABELS[status] || status);
+                stages.appendChild(item);
+            });
+            wrap.appendChild(stages);
+
+            const basis = [];
+            if (data.path_reason) basis.push(String(data.path_reason));
+            if (data.intent_reason) basis.push('路由：' + data.intent_reason);
+            if (Array.isArray(data.suggested_tools) && data.suggested_tools.length) {
+                basis.push('建议工具 ' + data.suggested_tools.join('、'));
+            }
+            if (basis.length) {
+                wrap.appendChild(traceEl(
+                    'div', 'trace-note', '决策依据：' + basis.join('；')));
+            }
+
+            const roles = Array.isArray(data.roles) ? data.roles : [];
+            const tools = Array.isArray(data.tools) ? data.tools : [];
+            const detailCount = roles.length + tools.length;
+            if (detailCount > 0) {
+                const detail = traceEl('div', 'trace-detail');
+                detail.hidden = true;
+                const detailId = 'traceDetail' + (traceSeq++);
+                detail.id = detailId;
+                if (roles.length) detail.appendChild(buildRoleList(roles));
+                if (tools.length) detail.appendChild(buildToolList(tools));
+
+                const toggle = traceEl('button', 'trace-toggle');
+                toggle.type = 'button';
+                toggle.setAttribute('aria-expanded', 'false');
+                toggle.setAttribute('aria-controls', detailId);
+                const setToggleText = (expanded) => {
+                    toggle.textContent = (expanded ? '收起' : '展开')
+                        + '角色与工具明细（' + detailCount + ' 项）';
+                };
+                setToggleText(false);
+                toggle.addEventListener('click', () => {
+                    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                    toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                    detail.hidden = expanded;
+                    setToggleText(!expanded);
+                });
+                wrap.appendChild(toggle);
+                wrap.appendChild(detail);
+            }
+
+            wrap.appendChild(buildSafetyReview(data));
+            return wrap;
         }
 
         // 智能体状态轮询
@@ -2382,6 +2992,147 @@
                     badge.className = 'agent-badge off';
                 }
             } catch (e) {}
+        }
+
+        // 智能体驾驶舱：按需拉取，不进 500ms 轮询
+        let cockpitExpanded = false;
+
+        const ROLE_LIVE_LABELS = {
+            completed: '本轮已执行',
+            standby: '本轮待命',
+            ready: '已就绪',
+            degraded: '降级',
+            blocked: '已拦截',
+            idle: '本轮未参与'
+        };
+        const SAFETY_LEVEL_LABELS = {
+            standard: '常规',
+            external: '外呼',
+            user_data: '用户数据',
+            safety_context: '安全语境'
+        };
+
+        async function toggleCockpit() {
+            const body = document.getElementById('cockpitBody');
+            const toggle = document.getElementById('cockpitToggle');
+            cockpitExpanded = !cockpitExpanded;
+            toggle.setAttribute('aria-expanded', cockpitExpanded ? 'true' : 'false');
+            body.hidden = !cockpitExpanded;
+            toggle.textContent = cockpitExpanded ? '收起角色与工具台账' : '展开角色与工具台账';
+            if (cockpitExpanded) await loadCockpit();
+        }
+
+        async function loadCockpit() {
+            const body = document.getElementById('cockpitBody');
+            const badge = document.getElementById('cockpitBadge');
+            try {
+                const res = await apiFetch('/api/agent/cockpit');
+                const data = await res.json();
+                if (!res.ok || data.success === false) {
+                    throw new Error(data.message || ('HTTP ' + res.status));
+                }
+                body.replaceChildren(buildCockpit(data));
+                badge.textContent = '已加载';
+                badge.className = 'agent-badge on';
+            } catch (e) {
+                body.replaceChildren(traceEl('div', 'cockpit-empty', '台账加载失败：' + e.message));
+                badge.textContent = '加载失败';
+                badge.className = 'agent-badge off';
+            }
+        }
+
+        function buildCockpit(data) {
+            const frag = document.createDocumentFragment();
+
+            const metrics = traceEl('div', 'cockpit-metrics');
+            metrics.appendChild(traceEl('span', 'cockpit-chip', '编排器 ' + (data.orchestrator_version || '-')));
+            metrics.appendChild(traceEl('span', 'cockpit-chip', '角色 ' + (data.role_count || 0)));
+            metrics.appendChild(traceEl('span', 'cockpit-chip', '工具 ' + (data.tool_count || 0)));
+            metrics.appendChild(traceEl('span', 'cockpit-chip',
+                '模型工具上限 ' + (data.max_model_tool_calls || 0) + ' 次'));
+            metrics.appendChild(traceEl('span', 'cockpit-chip',
+                '角色上限 ' + (data.max_specialist_roles || 0) + ' 个'));
+            const denied = data.denied_recent || 0;
+            metrics.appendChild(traceEl('span', 'cockpit-chip' + (denied ? ' alert' : ''),
+                '最近策略拒绝 ' + denied));
+            frag.appendChild(metrics);
+
+            const roles = Array.isArray(data.roles) ? data.roles : [];
+            const roleSection = traceEl('div', 'cockpit-section');
+            roleSection.appendChild(traceEl(
+                'div', 'cockpit-section-title', '角色目录（' + roles.length + '）'));
+            const roleList = traceEl('div', 'cockpit-roles');
+            roles.forEach((role) => {
+                const card = traceEl('div', 'cockpit-role');
+                const head = traceEl('div', 'cockpit-role-head');
+                head.appendChild(traceEl('span', 'cockpit-role-name', role.name || role.key || ''));
+                const status = String(role.last_status || 'idle');
+                head.appendChild(traceEl('span', 'cockpit-tag',
+                    ROLE_LIVE_LABELS[status] || status));
+                if (Array.isArray(role.preferred_tools) && role.preferred_tools.length) {
+                    head.appendChild(traceEl('span', 'cockpit-tag',
+                        role.preferred_tools.length + ' 个首选工具'));
+                }
+                card.appendChild(head);
+                if (role.description) {
+                    card.appendChild(traceEl('div', 'cockpit-role-desc', role.description));
+                }
+                if (role.authority) {
+                    card.appendChild(traceEl('div', 'cockpit-role-authority',
+                        '权限边界：' + role.authority));
+                }
+                roleList.appendChild(card);
+            });
+            roleSection.appendChild(roleList);
+            frag.appendChild(roleSection);
+
+            const tools = Array.isArray(data.tools) ? data.tools : [];
+            const toolSection = traceEl('div', 'cockpit-section');
+            toolSection.appendChild(traceEl(
+                'div', 'cockpit-section-title', '工具台账（' + tools.length + '）'));
+            const toolList = traceEl('div', 'cockpit-tools');
+            tools.forEach((tool) => {
+                const row = traceEl('div', 'cockpit-tool');
+                row.appendChild(traceEl('span', 'cockpit-tool-name', tool.name || ''));
+                const access = String(tool.access || 'read');
+                row.appendChild(traceEl('span', 'cockpit-tag' + (access === 'write' ? ' write' : ''),
+                    access === 'write' ? '可写' : '只读'));
+                const level = String(tool.safety_level || 'standard');
+                row.appendChild(traceEl('span', 'cockpit-tag' + (level === 'external' ? ' external' : ''),
+                    SAFETY_LEVEL_LABELS[level] || level));
+                row.appendChild(traceEl('span', 'cockpit-tag',
+                    ((tool.timeout_ms || 0) / 1000).toFixed(1) + 's'));
+                if (tool.description) row.title = String(tool.description);
+                toolList.appendChild(row);
+            });
+            toolSection.appendChild(toolList);
+            frag.appendChild(toolSection);
+
+            const audit = Array.isArray(data.recent_audit) ? data.recent_audit : [];
+            const auditSection = traceEl('div', 'cockpit-section');
+            auditSection.appendChild(traceEl(
+                'div', 'cockpit-section-title', '最近调用审计（' + audit.length + '）'));
+            const auditList = traceEl('div', 'cockpit-audit');
+            if (!audit.length) {
+                auditList.appendChild(traceEl('div', 'cockpit-empty', '还没有工具调用记录'));
+            }
+            audit.slice().reverse().forEach((item) => {
+                const row = traceEl('div', 'cockpit-audit-row');
+                row.appendChild(traceEl('span', 'cockpit-tool-name', item.name || ''));
+                row.appendChild(traceEl('span', 'cockpit-tag',
+                    item.success ? '成功' : (item.timed_out ? '超时' : '失败')));
+                row.appendChild(traceEl('span', 'cockpit-tag',
+                    (item.duration_ms || 0) + ' ms'));
+                if (item.error) {
+                    row.appendChild(traceEl('span', 'cockpit-tag',
+                        String(item.error).slice(0, 40)));
+                }
+                auditList.appendChild(row);
+            });
+            auditSection.appendChild(auditList);
+            frag.appendChild(auditSection);
+
+            return frag;
         }
 
         async function syncSystemState() {
@@ -2420,6 +3171,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             updateUI();
             updateAgentStatus();
+            loadCockpit();
             applyOverlay();
             await syncSystemState();
             setInterval(updateAgentStatus, 3000);

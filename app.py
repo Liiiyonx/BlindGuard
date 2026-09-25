@@ -305,6 +305,7 @@ class BlindGuardApp:
         self.app.add_url_rule('/api/detections', 'detections', self._get_detections)
         self.app.add_url_rule('/api/chat', 'chat', self._chat, methods=['POST'])
         self.app.add_url_rule('/api/agent/status', 'agent_status', self._agent_status)
+        self.app.add_url_rule('/api/agent/cockpit', 'agent_cockpit', self._agent_cockpit)
         # PWA
         self.app.add_url_rule('/manifest.json', 'manifest',
                               lambda: send_from_directory('static', 'manifest.json'))
@@ -833,7 +834,8 @@ class BlindGuardApp:
                 'success': True,
                 'reply': reply,
                 'llm_active': self.agent.llm_available(),
-                'detection_count': len(dets)
+                'detection_count': len(dets),
+                'orchestration': self.agent.last_orchestration(),
             })
         except Exception as e:
             logger.error(f"对话异常: {e}")
@@ -844,6 +846,14 @@ class BlindGuardApp:
         if self.last_announce_latency_ms is not None:
             status['announce_latency_ms'] = self.last_announce_latency_ms
         return jsonify(status)
+
+    def _agent_cockpit(self):
+        # 驾驶舱按需拉取，不进 500ms 轮询；只读，不执行任何工具
+        try:
+            return jsonify(self.agent.cockpit())
+        except Exception as e:
+            logger.error(f"驾驶舱快照异常: {e}")
+            return jsonify({'success': False, 'message': f'获取失败: {e}'}), 500
 
     def run(self):
         try:

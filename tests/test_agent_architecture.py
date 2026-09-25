@@ -10,6 +10,7 @@ import unittest
 from core.agent import AGENT_TOOLS, BlindGuardAgent
 from core.agent_orchestrator import IntentRouter, assess_announcement
 from core.agent_tools import ToolRegistry
+from core import safety_policy
 from core.user_profile import UserProfile
 
 
@@ -497,6 +498,10 @@ class AgentOrchestrationTests(unittest.TestCase):
         self.assertTrue(review["passage_intent"])
         self.assertTrue(review["raw_reply_dangerous"])
         self.assertTrue(review["guard_triggered"])
+        # 整句替换必须被标记为 replaced，前端据此显示原始回复与保守答复的对照
+        self.assertEqual(
+            review["action"], safety_policy.REPLY_ACTION_REPLACED)
+        self.assertEqual(review["appended"], "")
         self.assertTrue(review["safety_rewritten"])
         self.assertFalse(review["final_reply_dangerous"])
         self.assertTrue(review["idempotent"])
@@ -521,10 +526,68 @@ class AgentOrchestrationTests(unittest.TestCase):
         review = run["safety_review"]
         self.assertEqual(run["raw_reply"], run["sanitized_reply"])
         self.assertFalse(review["raw_reply_dangerous"])
+        # 未改动时必须显式标记 unchanged，前端不展示任何对照块
+        self.assertEqual(
+            review["action"], safety_policy.REPLY_ACTION_UNCHANGED)
+        self.assertEqual(review["appended"], "")
         self.assertFalse(review["safety_rewritten"])
         self.assertFalse(review["guard_triggered"])
         self.assertTrue(review["guard_passed"])
         self.assertTrue(run["final_safe"])
+
+    def test_model_failure_is_recorded_as_local_fallback(self):
+        # 模型中途不可用时链路必须如实标注本地兜底，
+        # 不能一边显示"模型推理已完成"一边给的是离线模板回答。
+        agent = BlindGuardAgent({
+            "enabled": True,
+            "llm": {
+                "base_url": "http://127.0.0.1:9/v1",
+                "api_key": "test-key",
+                "model": "unreachable",
+            },
+        })
+        agent.set_context(FakeContext())
+        reply = agent.chat("前面有什么？", [car()], "high")
+
+        self.assertTrue(reply)
+        orchestration = agent.last_orchestration()
+        self.assertEqual(orchestration["path"], "llm_context")
+        self.assertTrue(orchestration["used_local_fallback"])
+        self.assertTrue(orchestration["path_reason"])
+
+    def test_local_safety_path_is_not_marked_as_fallback(self):
+        agent = BlindGuardAgent({"enabled": True})
+        agent.chat("现在能过马路吗？", [car()], "high")
+
+        orchestration = agent.last_orchestration()
+        self.assertEqual(orchestration["path"], "deterministic_safety")
+        self.assertFalse(orchestration["used_local_fallback"])
+
+    def test_cockpit_exposes_roles_tools_and_audit(self):
+        # 驾驶舱面板依赖这些字段，缺任何一个都会让台账显示不出来
+        agent = BlindGuardAgent({"enabled": True})
+        cockpit = agent.cockpit()
+
+        self.assertEqual(cockpit["role_count"], 10)
+        self.assertEqual(cockpit["tool_count"], 13)
+        self.assertEqual(len(cockpit["roles"]), 10)
+        self.assertEqual(len(cockpit["tools"]), 13)
+        self.assertGreater(cockpit["max_model_tool_calls"], 0)
+        for role in cockpit["roles"]:
+            self.assertTrue(role["name"])
+            self.assertTrue(role["authority"], "每个角色都必须声明权限边界")
+            self.assertIn("last_status", role)
+        for tool in cockpit["tools"]:
+            self.assertIn(tool["access"], ("read", "write"))
+            self.assertTrue(tool["safety_level"])
+            self.assertGreater(tool["timeout_ms"], 0)
+
+        access = {item["name"]: item["access"] for item in cockpit["tools"]}
+        levels = {
+            item["name"]: item["safety_level"] for item in cockpit["tools"]
+        }
+        self.assertEqual(access["set_user_preference"], "write")
+        self.assertEqual(levels["look_at_frame"], "external")
 
     def test_navigation_advice_never_authorizes_crossing(self):
         agent = BlindGuardAgent({"enabled": True})

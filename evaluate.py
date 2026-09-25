@@ -19,6 +19,15 @@ BlindGuard 答辩指标评测脚本
   python evaluate.py bootstrap [--source video.mp4] [--stride 30] [--frames 150]
       从视频抽帧 + 模型伪标签输出 YOLO 格式，人工用 labelImg/CVAT 校正后
       即可作为测试集
+
+  python evaluate.py e2e-init [--source uploads/video.mp4] [--frames 40]
+      端到端标注底稿：按当前生产管线（双模型 + 裁剪 + 合并）抽帧并把预测
+      框写入标注文件，人工只需增删改，不必从零画框
+
+  python evaluate.py e2e [--labels evaluation/e2e_labels.json]
+      当前部署配置端到端指标：用生产管线跑人工校正后的真值，输出各类别
+      精确率/召回率/F1、高危类别漏检清单与灯色准确率。
+      口径与 accuracy（单模型离线 mAP）不同，不可互相替代。
 """
 
 import os
@@ -550,6 +559,339 @@ def cmd_collect(args):
     print(f"       说明: json 中坐标基于原始帧宽 {fw}，人工核对时请按 560/{fw} 换算")
 
 
+# ==================== e2e：当前部署配置的端到端指标 ====================
+#
+# 与 accuracy 模式的区别（答辩口径，不可混用）：
+#   accuracy  = 单模型 + ultralytics val，测的是模型在离线测试集上的 mAP；
+#   e2e       = 生产管线（主辅双模型 + 竖屏裁剪 + IoU 合并 + 灯色识别），
+#               测的是"当前部署配置"在人工校正真值上的精确率/召回率。
+# 两者数字必然不同，任何引用都必须写明来源。
+
+def _valid_box(item) -> bool:
+    bbox = list((item or {}).get('bbox') or [])
+    return len(bbox) >= 4
+
+
+def _normalize_boxes(items):
+    """把标注或检测结果统一成 {class_name, bbox, light_state} 列表。"""
+    result = []
+    for item in items or []:
+        if not _valid_box(item):
+            continue
+        bbox = [float(value) for value in list(item['bbox'])[:4]]
+        result.append({
+            'class_name': str(item.get('class_name') or ''),
+            'bbox': bbox,
+            'light_state': item.get('light_state'),
+        })
+    return result
+
+
+def box_iou(a, b) -> float:
+    """两个 [x1, y1, x2, y2] 框的 IoU。"""
+    ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
+    ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
+    intersection = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+    if intersection <= 0:
+        return 0.0
+    area_a = max(0.0, a[2] - a[0]) * max(0.0, a[3] - a[1])
+    area_b = max(0.0, b[2] - b[0]) * max(0.0, b[3] - b[1])
+    union = area_a + area_b - intersection
+    return intersection / union if union > 0 else 0.0
+
+
+def match_frame(gt_boxes, predictions, iou_threshold: float = 0.5):
+    """同类别内按 IoU 贪心匹配真值与预测。
+
+    返回 (matches, missed, false_positives)：
+    - matches: [(真值框, 预测框), ...]
+    - missed: 漏检的真值框（安全上比误检更危险）
+    - false_positives: 未命中任何真值的预测框
+    """
+    pairs = []
+    for gt_index, gt in enumerate(gt_boxes):
+        for pred_index, pred in enumerate(predictions):
+            if gt['class_name'] != pred['class_name']:
+                continue
+            iou = box_iou(gt['bbox'], pred['bbox'])
+            if iou >= iou_threshold:
+                pairs.append((iou, gt_index, pred_index))
+    pairs.sort(key=lambda item: item[0], reverse=True)
+
+    used_gt, used_pred, matches = set(), set(), []
+    for _iou, gt_index, pred_index in pairs:
+        if gt_index in used_gt or pred_index in used_pred:
+            continue
+        used_gt.add(gt_index)
+        used_pred.add(pred_index)
+        matches.append((gt_boxes[gt_index], predictions[pred_index]))
+
+    missed = [
+        gt for index, gt in enumerate(gt_boxes) if index not in used_gt
+    ]
+    false_positives = [
+        pred for index, pred in enumerate(predictions)
+        if index not in used_pred
+    ]
+    return matches, missed, false_positives
+
+
+def prf_counts(tp: int, fp: int, fn: int):
+    """返回 (精确率, 召回率, F1)。"""
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if (precision + recall) else 0.0
+    )
+    return precision, recall, f1
+
+
+def cmd_e2e_init(args):
+    """按生产管线抽帧并写入端到端标注底稿（预测框即起点，人工只做增删改）。"""
+    import cv2
+    import json
+    from core.config_manager import ConfigManager
+
+    config = ConfigManager('config.yaml')
+    pipeline, _, _ = _build_production_pipeline(config)
+
+    out_dir = os.path.join('evaluation', 'e2e_frames')
+    os.makedirs(out_dir, exist_ok=True)
+
+    cap = cv2.VideoCapture(args.source)
+    if not cap.isOpened():
+        print(f"[错误] 无法打开视频: {args.source}")
+        sys.exit(1)
+
+    frames, saved, frame_index = [], 0, 0
+    while saved < args.frames:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        if frame_index % args.stride == 0:
+            result = pipeline.process(frame)
+            file_path = os.path.join(out_dir, f"frame_{frame_index:06d}.jpg")
+            # 保存原始帧：坐标空间与管线输出一致，标注时无需换算
+            cv2.imwrite(file_path, frame)
+            boxes = []
+            for det in result['detections']:
+                if not _valid_box(det):
+                    continue
+                boxes.append({
+                    'class_name': det.get('class_name'),
+                    'bbox': [int(round(v)) for v in det['bbox']],
+                    'light_state': det.get('light_state'),
+                })
+            frames.append({
+                'frame': frame_index,
+                'file': file_path.replace('\\', '/'),
+                'boxes': boxes,
+                'auto_filled': True,
+            })
+            saved += 1
+        frame_index += 1
+    cap.release()
+
+    payload = {
+        'meta': {
+            'source': args.source,
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'annotation': (
+                '自动填入的是模型预测，必须逐帧人工增删改后才算真值；'
+                '人工确认过的帧请把 auto_filled 改为 false'
+            ),
+            'annotator': '',
+            'notes': '',
+        },
+        'iou_threshold': 0.5,
+        'frames': frames,
+    }
+    with open(args.labels, 'w', encoding='utf-8') as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=1)
+
+    print(f"[完成] 已抽取 {saved} 帧到 {out_dir}")
+    print(f"       标注底稿: {args.labels}")
+    print("下一步：")
+    print("  1. 逐帧核对 boxes：删掉误检框、改错类别、补漏检目标")
+    print("  2. 红绿灯框补 light_state（red/yellow/green/unknown）")
+    print("  3. 确认过的帧把 auto_filled 改成 false")
+    print("  4. 运行: python evaluate.py e2e --labels " + args.labels)
+
+
+def cmd_e2e(args):
+    """用生产管线评价当前部署配置的端到端检测与灯色指标。"""
+    import cv2
+    import json
+    from core.config_manager import ConfigManager
+
+    if not os.path.exists(args.labels):
+        print(f"[错误] 标注文件不存在: {args.labels}")
+        print("请先运行: python evaluate.py e2e-init --source uploads/video.mp4")
+        sys.exit(1)
+
+    with open(args.labels, 'r', encoding='utf-8') as handle:
+        payload = json.load(handle)
+    frames = payload.get('frames') or []
+    if not frames:
+        print("[错误] 标注文件里没有帧记录")
+        sys.exit(1)
+
+    iou_threshold = (
+        float(args.iou) if args.iou is not None
+        else float(payload.get('iou_threshold') or 0.5)
+    )
+
+    config = ConfigManager('config.yaml')
+    pipeline, _, model_paths = _build_production_pipeline(config)
+    model_cfg = config.get_section('model')
+    risk_cfg = config.get_section('risk')
+    high_risk_classes = {
+        str(name) for name in (risk_cfg.get('high_risk_classes') or [])
+    }
+
+    counts = {}
+    examined = 0
+    pending = 0
+    gt_total = pred_total = 0
+    light_total = light_hit = light_silent = light_missing = 0
+    missed_high_risk = {}
+    skipped = []
+
+    for item in frames:
+        path = item.get('file')
+        if not path or not os.path.exists(path):
+            skipped.append(str(path))
+            continue
+        image = cv2.imread(path)
+        if image is None:
+            skipped.append(str(path))
+            continue
+        if item.get('auto_filled'):
+            pending += 1
+
+        result = pipeline.process(image)
+        gt_boxes = _normalize_boxes(item.get('boxes'))
+        predictions = _normalize_boxes(result['detections'])
+        matches, missed, false_positives = match_frame(
+            gt_boxes, predictions, iou_threshold)
+
+        gt_total += len(gt_boxes)
+        pred_total += len(predictions)
+        for gt_box, _pred in matches:
+            bucket = counts.setdefault(
+                gt_box['class_name'], {'tp': 0, 'fp': 0, 'fn': 0})
+            bucket['tp'] += 1
+        for gt_box in missed:
+            bucket = counts.setdefault(
+                gt_box['class_name'], {'tp': 0, 'fp': 0, 'fn': 0})
+            bucket['fn'] += 1
+            if gt_box['class_name'] in high_risk_classes:
+                missed_high_risk[gt_box['class_name']] = (
+                    missed_high_risk.get(gt_box['class_name'], 0) + 1)
+        for pred in false_positives:
+            bucket = counts.setdefault(
+                pred['class_name'], {'tp': 0, 'fp': 0, 'fn': 0})
+            bucket['fp'] += 1
+
+        for gt_box, pred in matches:
+            expected = gt_box.get('light_state')
+            if gt_box['class_name'] != 'traffic_light' or not expected:
+                continue
+            light_total += 1
+            actual = pred.get('light_state')
+            if actual == expected:
+                light_hit += 1
+            elif actual in (None, '', 'unknown'):
+                light_silent += 1
+        for gt_box in missed:
+            if (gt_box['class_name'] == 'traffic_light'
+                    and gt_box.get('light_state')):
+                light_total += 1
+                light_missing += 1
+
+        examined += 1
+
+    if not examined:
+        print("[错误] 没有可用的帧，未产生指标")
+        sys.exit(1)
+
+    total_tp = sum(item['tp'] for item in counts.values())
+    total_fp = sum(item['fp'] for item in counts.values())
+    total_fn = sum(item['fn'] for item in counts.values())
+    precision, recall, f1 = prf_counts(total_tp, total_fp, total_fn)
+
+    lines = _model_report_lines(config, model_paths) + [
+        f"- 口径: **生产管线端到端**（主辅双模型 + 竖屏裁剪 + IoU 合并 + 灯色识别），"
+        "非单模型离线 mAP，两者不可互相引用",
+        f"- 真值来源: `{args.labels}`（标注人: "
+        f"{payload.get('meta', {}).get('annotator') or '未填写'}）",
+        f"- 评测帧数: {examined}"
+        + (f"，其中 {pending} 帧仍是模型自动填充、未经人工校正" if pending else ""),
+        f"- 匹配 IoU 阈值: {iou_threshold}",
+        f"- 主模型输入尺寸: {model_cfg.get('img_size')} px，"
+        f"竖屏中心裁剪: {'开启' if model_cfg.get('portrait_crop') else '关闭'}",
+        f"- 辅助模型: `{model_cfg.get('aux_model_path') or '未启用'}`"
+        f"（输入 {model_cfg.get('aux_img_size')} px，白名单 "
+        f"{'、'.join(model_cfg.get('aux_classes') or []) or '未配置'}）",
+        f"- 置信度阈值: {model_cfg.get('confidence_threshold')}",
+        "",
+        f"- 真值框总数: {gt_total}，预测框总数: {pred_total}",
+        f"- **精确率: {precision * 100:.1f}%**（{total_tp} 正确 / {total_fp} 误检）",
+        f"- **召回率: {recall * 100:.1f}%**（{total_fn} 漏检）",
+        f"- **F1: {f1 * 100:.1f}%**",
+        "",
+        "| 类别 | 正确 | 漏检 | 误检 | 精确率 | 召回率 |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for name in sorted(counts, key=lambda key: -counts[key]['fn']):
+        item = counts[name]
+        class_p, class_r, _ = prf_counts(item['tp'], item['fp'], item['fn'])
+        lines.append(
+            f"| {name} | {item['tp']} | {item['fn']} | {item['fp']} | "
+            f"{class_p * 100:.1f}% | {class_r * 100:.1f}% |")
+
+    lines.append("")
+    if missed_high_risk:
+        detail = "、".join(
+            f"{name} {count} 个" for name, count in sorted(
+                missed_high_risk.items(), key=lambda kv: -kv[1]))
+        lines.append(
+            f"- **高危类别漏检: {sum(missed_high_risk.values())} 个**（{detail}）"
+            "——安全关键指标，目标为 0")
+    else:
+        lines.append("- 高危类别漏检: 0 个（本批样本）")
+
+    if light_total:
+        lines.append(
+            f"- 灯色准确率: **{light_hit / light_total * 100:.1f}%**"
+            f"（{light_total} 个真值灯）")
+        lines.append(
+            f"- 其中保守沉默（识别为 unknown）: "
+            f"{light_silent / light_total * 100:.1f}%，灯未被检出: "
+            f"{light_missing / light_total * 100:.1f}%")
+    else:
+        lines.append("- 灯色: 本批真值未提供 light_state，无法统计")
+
+    if skipped:
+        lines.append(f"- 跳过 {len(skipped)} 帧（文件缺失或不可读）")
+    lines.append(
+        "- 限制: 本指标只代表这批人工校正样本上的表现，"
+        "样本量与场景分布决定可信区间，不能外推为全部场景准确率。")
+
+    for line in lines:
+        print("  " + line)
+
+    if pending:
+        # 未人工校正的样本等于拿模型预测评模型，数字必然虚高，
+        # 绝不允许写进答辩报告，只能作为联调自检输出。
+        print(f"\n[不写入报告] 有 {pending}/{examined} 帧仍是模型自动填充、"
+              "未经人工校正；请逐帧核对并把 auto_filled 改为 false 后重跑。")
+        return
+
+    _append_report("当前部署配置端到端指标（e2e）", lines)
+
+
 def main():
     parser = argparse.ArgumentParser(description='BlindGuard 答辩指标评测')
     sub = parser.add_subparsers(dest='cmd', required=True)
@@ -582,6 +924,21 @@ def main():
     p.add_argument('--frames', type=int, default=12, help='最多保存抽检帧数')
     p.add_argument('--light-max', type=int, default=24, help='最多保存红绿灯裁剪图数')
     p.set_defaults(func=cmd_collect)
+
+    p = sub.add_parser('e2e-init', help='端到端标注底稿（预测框作起点）')
+    p.add_argument('--source', default='uploads/video.mp4')
+    p.add_argument('--stride', type=int, default=30, help='每 N 帧抽 1 帧')
+    p.add_argument('--frames', type=int, default=40, help='最多抽取帧数')
+    p.add_argument('--labels', default=os.path.join('evaluation', 'e2e_labels.json'),
+                   help='标注文件输出路径')
+    p.set_defaults(func=cmd_e2e_init)
+
+    p = sub.add_parser('e2e', help='当前部署配置端到端精确率/召回率/灯色')
+    p.add_argument('--labels', default=os.path.join('evaluation', 'e2e_labels.json'),
+                   help='人工校正后的标注文件')
+    p.add_argument('--iou', type=float, default=None,
+                   help='匹配 IoU 阈值，默认取标注文件里的 iou_threshold')
+    p.set_defaults(func=cmd_e2e)
 
     args = parser.parse_args()
     args.func(args)

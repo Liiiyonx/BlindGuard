@@ -32,6 +32,18 @@ RISK_SCORE = {
     "safe": 0,
 }
 
+# 每条执行路径的可解释依据：前端"决策依据"优先展示它，
+# 避免出现"路径是确定性安全拦截、依据却说交给模型循环"的自相矛盾。
+PATH_REASONS = {
+    "deterministic_safety": (
+        "通行问题命中确定性安全规则，直接本地拒绝，不等待模型"
+    ),
+    "local_control": "命中本地确定性控制意图，由本地代码直接执行",
+    "local_fallback": "模型当前不可用，走本地兜底回答",
+    "llm_context": "本地预取与角色执行完成后，交给模型组织回答",
+    "llm_tool_loop": "模型在工具循环中自行取数后回答",
+}
+
 
 @dataclass(frozen=True)
 class AgentRole:
@@ -354,6 +366,15 @@ class AgentOrchestrator:
 
     VERSION = "1.1"
 
+    # 通行问题里还夹带了“往哪走 / 站在哪 / 怎么绕”这类非通行求助时，
+    # 确定性拒绝通行之后仍应给出避障建议，而不是只回一句“不能通行”。
+    ASSIST_PATTERNS = (
+        re.compile(r"(?:往|朝|向)哪(?:边|个方向|里)?"),
+        re.compile(r"(?:站在|停在|退到|移到|挪到).{0,4}(?:哪|什么位置)"),
+        re.compile(r"(?:怎么走|该怎么|如何绕|绕开|让开|避开)"),
+        re.compile(r"(?:旁边|两侧|左右).{0,4}(?:有|有没有|情况)"),
+    )
+
     def __init__(self, agent, *, max_tool_rounds: int = 3,
                  trace_size: int = 80, max_model_tool_calls: int = 6,
                  max_specialist_roles: int = 3):
@@ -403,13 +424,14 @@ class AgentOrchestrator:
             user_message, detections, risk_level
         )
         if decision.should_bypass_llm:
+            assist = self._non_passage_assist(user_message, calls, tool_cache)
             return self._finish_chat(
                 user_message=user_message,
-                reply=decision.reply,
+                reply=decision.reply + assist,
                 detections=detections,
                 risk_level=risk_level,
                 plan=plan,
-                calls=[],
+                calls=calls,
                 role_contributions=[],
                 path="deterministic_safety",
                 started=started,
@@ -551,10 +573,12 @@ class AgentOrchestrator:
         if not reply:
             final = self.agent._call_llm(messages, max_tokens=200)
             reply = self.agent._clean(final.get("content") or "")
+        used_local_fallback = False
         if not reply:
             reply = self.agent._fallback_chat(
                 user_message, detections, risk_level
             )
+            used_local_fallback = True
         return self._finish_chat(
             user_message=user_message,
             reply=reply,
@@ -568,8 +592,64 @@ class AgentOrchestrator:
                 if any(call.get("phase") == "model" for call in calls)
                 else "llm_context"
             ),
+            used_local_fallback=used_local_fallback,
             started=started,
         )
+
+    def _non_passage_assist(
+        self,
+        user_message: str,
+        calls: List[Dict],
+        tool_cache: Dict[str, ToolResult],
+    ) -> str:
+        """通行被确定性拒绝后，按需追加一段非通行避障建议。
+
+        只用本地只读的导航工具，回传的每个字段都来自工具输出，不新增
+        任何可能被安全守门员判为授权措辞的自撰文案；工具不可用时返回空串，
+        绝不影响安全拒绝本身。
+        """
+        text = re.sub(r"\s+", "", user_message or "")
+        if not any(pattern.search(text) for pattern in self.ASSIST_PATTERNS):
+            return ""
+
+        result, cache_hit = self._execute_tool_cached(
+            "get_navigation_guidance", "{}", tool_cache
+        )
+        self._append_tool_call(
+            calls,
+            round_index=0,
+            phase="specialist",
+            name="get_navigation_guidance",
+            arguments="{}",
+            result=result,
+            cache_hit=cache_hit,
+        )
+        self._trace_tool(
+            0, "get_navigation_guidance", "{}", result,
+            phase="specialist", cache_hit=cache_hit,
+        )
+        if not result.success:
+            return ""
+
+        payload = result.payload or {}
+        parts = []
+        zone_targets = payload.get("zone_targets") or {}
+        zone_text = "、".join(
+            f"{zone}{'、'.join(str(name) for name in names)}"
+            for zone, names in zone_targets.items()
+            if names
+        )
+        if zone_text:
+            parts.append(f"当前方位：{zone_text}。")
+        actions = [str(item) for item in (payload.get("actions") or [])][:2]
+        if actions:
+            parts.append("；".join(actions) + "。")
+        safety_note = str(payload.get("safety_note") or "").strip()
+        if safety_note:
+            parts.append(safety_note)
+        if not parts:
+            return ""
+        return " " + "".join(parts)
 
     def _prefetch_context(
         self,
@@ -1080,12 +1160,14 @@ class AgentOrchestrator:
         calls: List[Dict],
         role_contributions: Optional[List[Dict]] = None,
         path: str,
+        used_local_fallback: bool = False,
         started: float,
     ) -> str:
         raw_reply = str(reply or "").strip()
-        safe_reply = safety_policy.enforce_reply_safety(
+        outcome = safety_policy.review_reply_safety(
             user_message, raw_reply, detections, risk_level
         )
+        safe_reply = outcome.reply
         passage_intent = safety_policy.has_passage_intent(user_message)
         raw_dangerous = safety_policy.is_dangerous_approval(raw_reply)
         final_dangerous = safety_policy.is_dangerous_approval(safe_reply)
@@ -1098,6 +1180,8 @@ class AgentOrchestrator:
             "guard_triggered": bool(
                 passage_intent or raw_dangerous or not raw_reply
             ),
+            "action": outcome.action,
+            "appended": outcome.appended,
             "safety_rewritten": raw_reply != safe_reply,
             "final_reply_dangerous": final_dangerous,
             "idempotent": safe_reply == review_twice,
@@ -1163,9 +1247,14 @@ class AgentOrchestrator:
         self.last_run = {
             "time": round(time.time(), 3),
             "path": path,
+            "path_reason": PATH_REASONS.get(path, ""),
+            "used_local_fallback": bool(used_local_fallback),
             "intent": plan.intent,
+            "intent_confidence": plan.confidence,
+            "intent_reason": plan.reason,
             "lead_role": plan.lead_role,
             "supporting_roles": list(plan.supporting_roles),
+            "suggested_tools": list(plan.suggested_tools),
             "duration_ms": max(
                 0, round((time.perf_counter() - started) * 1000)
             ),

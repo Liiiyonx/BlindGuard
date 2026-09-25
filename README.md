@@ -65,7 +65,7 @@ BlindGuard/
 ├── run.py                    # 启动脚本（含环境检查）
 ├── smoke_test.py             # 冒烟测试脚本
 ├── test_agent_tools.py       # 工具调用循环端到端测试（本地模拟 LLM）
-├── evaluate.py               # 答辩指标评测（perf/accuracy/light/bootstrap/collect）
+├── evaluate.py               # 答辩指标评测（perf/accuracy/light/bootstrap/collect/e2e）
 ├── train.py                  # 模型重训练脚本（数据集yaml驱动，训练后自动评测对比）
 ├── config.yaml               # 唯一配置文件（检测/风险/语音/Agent/视觉）
 ├── .env                      # 私密配置（API Key，已 gitignore）
@@ -94,7 +94,8 @@ BlindGuard/
 ├── templates/
 │   └── index.html            # Web 界面（监控 + 语音对话）
 ├── docs/                     # 答辩与产品文档
-│   ├── 演示脚本.md            # 90 秒演示流程与翻车预案
+│   ├── 演示脚本.md            # 现场分镜、问答话术与 60 秒压缩版
+│   ├── 答辩一页纸.html        # 投影/打印用一页纸证据（浏览器直接打开）
 │   ├── 用户测试方案.md        # 志愿者内测方案与记录表
 │   ├── 安全策略.md            # 确定性安全边界、失败策略与测试
 │   ├── 评测复现与答辩证据.md  # 指标口径、复现命令与真实数据缺口
@@ -147,6 +148,8 @@ BlindGuard/
 - 实时视频流、FPS、检测目标数
 - 整体风险等级（后端综合评估）、场景类型
 - 智能对话面板（含 LLM 在线状态徽章）
+- **编排链路证据**：每条回复气泡下方展示意图与置信度、主责角色、执行路径、决策依据、6 个阶段状态、角色结论与工具轨迹，以及安全守门员对模型回复的改写对照（改了什么直接高亮）
+- **智能体架构台账**：侧边栏按需拉取的角色目录、工具读写/安全级别/超时与最近调用审计，用于回答"多智能体与权限控制是否真实"
 - 受保护页面/API/视频流令牌认证；前端动态内容使用 `textContent`，不注入动态 HTML
 
 ## 产品定位与安全边界
@@ -209,6 +212,8 @@ python evaluate.py light --synthetic 60    # 红绿灯识别自检；有真实�
 python evaluate.py collect            # 采集人工抽检帧+红绿灯裁剪图
 python evaluate.py bootstrap          # 从视频抽帧+伪标签，人工校正后生成测试集
 python evaluate.py accuracy --data data_eval.yaml   # mAP / 各类别 AP
+python evaluate.py e2e-init           # 端到端标注底稿：按生产管线抽帧并填入预测框
+python evaluate.py e2e                # 当前部署配置端到端精确率/召回率/高危漏检/灯色
 # 结果写入 evaluation/metrics_report.md，答辩可直接引用
 ```
 
@@ -295,6 +300,7 @@ server:
 - `GET  /api/detections` - 当前检测结果（含风险等级、风险分值、红绿灯状态、运动趋势）
 - `POST /api/chat` - 智能对话 `{"message": "前面有什么"}`（Agent 可自主调用工具）
 - `GET  /api/agent/status` - Agent 状态（角色目录 10 个、13 个工具、预取轨迹、LLM/视觉健康、记忆帧数）
+- `GET  /api/agent/cockpit` - 智能体台账（按需拉取：角色职责与权限边界、工具读写/安全级别/超时、最近调用审计）
 
 ### 访问认证
 

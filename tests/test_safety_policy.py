@@ -180,6 +180,104 @@ class SafetyPolicyTests(unittest.TestCase):
             '',
         )
 
+    def test_reply_safety_outcome_reports_what_changed(self):
+        # 前端要把“改了什么”显示出来，动作类型即该契约。
+        detections = [traffic_light('green', 'medium')]
+
+        replaced = safety_policy.review_reply_safety(
+            '现在能过马路吗？', '检测到绿灯，可以安全通行。', detections, 'medium')
+        self.assertEqual(
+            replaced.action, safety_policy.REPLY_ACTION_REPLACED)
+        self.assertIn('不能确认', replaced.reply)
+        self.assertEqual(replaced.appended, '')
+        self.assertFalse(safety_policy.is_dangerous_approval(replaced.reply))
+
+        appended = safety_policy.review_reply_safety(
+            '现在能过马路吗？', '检测到绿灯。', detections, 'medium')
+        self.assertEqual(
+            appended.action, safety_policy.REPLY_ACTION_DISCLAIMER_APPENDED)
+        self.assertEqual(
+            appended.appended, safety_policy.SAFETY_DISCLAIMER_SENTENCE)
+        # 追加分支必须保留原句，只在其后补保守说明
+        self.assertTrue(appended.reply.startswith('检测到绿灯。'))
+        self.assertTrue(appended.reply.endswith(appended.appended))
+
+        untouched = safety_policy.review_reply_safety(
+            '前面有什么？', '检测到汽车正在接近。', [high_risk_object()], 'high')
+        self.assertEqual(
+            untouched.action, safety_policy.REPLY_ACTION_UNCHANGED)
+        self.assertEqual(untouched.reply, '检测到汽车正在接近。')
+        self.assertEqual(untouched.appended, '')
+
+    def test_review_outcome_matches_reply_wrapper(self):
+        # 旧接口必须与新接口给出同一最终文本，避免两条路径漂移。
+        detections = [traffic_light('green', 'medium')]
+        for question, original in (
+            ('现在能过马路吗？', '检测到绿灯。'),
+            ('现在能过马路吗？', '检测到绿灯，可以安全通行。'),
+            ('前面有什么？', '检测到汽车正在接近。'),
+            ('现在能过马路吗？', ''),
+        ):
+            outcome = safety_policy.review_reply_safety(
+                question, original, detections, 'medium')
+            self.assertEqual(
+                outcome.reply,
+                safety_policy.enforce_reply_safety(
+                    question, original, detections, 'medium'),
+                f'两条路径文本不一致: {question} / {original}')
+
+    def test_passage_refusal_still_gives_non_passage_guidance(self):
+        # 复合问题（能否过街 + 该往哪站）必须先确定性拒绝通行，
+        # 再用导航工具补一段非通行建议，而不是只回一句“不能通行”。
+        agent = BlindGuardAgent({
+            'enabled': True,
+            'llm': {
+                'base_url': 'http://127.0.0.1:9/v1',
+                'api_key': 'test-key',
+                'model': 'must-not-be-called',
+            },
+        })
+
+        def fail_if_called(*args, **kwargs):
+            raise AssertionError('确定性安全路径不应调用 LLM')
+
+        agent._call_llm = fail_if_called
+        detections = [traffic_light('red')]
+        # 导航工具读取的是 Agent 自己的逐帧状态，而不是 chat() 的入参
+        agent.update_memory(detections, 'high', 640, 480)
+        reply = agent.chat('现在能过马路吗？不能的话我该往哪边站', detections, 'high')
+
+        self.assertIn('不要通行', reply)
+        self.assertIn('当前方位：正前方红绿灯', reply)
+        self.assertIn('停在当前位置', reply)
+        self.assertIn('不包含过街或通行授权', reply)
+        self.assertFalse(safety_policy.is_dangerous_approval(reply))
+
+        orchestration = agent.last_orchestration()
+        self.assertEqual(orchestration['path'], 'deterministic_safety')
+        # 决策依据必须解释真实走的路径，不能与路径自相矛盾
+        self.assertIn('确定性安全规则', orchestration['path_reason'])
+        self.assertIn(
+            'get_navigation_guidance',
+            [tool['name'] for tool in orchestration['tools']],
+            '复合问题应留下导航工具的真实调用记录')
+
+    def test_plain_passage_question_skips_navigation_guidance(self):
+        # 没有夹带非通行求助时不应多调导航工具，保持原有确定性路径
+        agent = BlindGuardAgent({
+            'enabled': True,
+            'llm': {
+                'base_url': 'http://127.0.0.1:9/v1',
+                'api_key': 'test-key',
+                'model': 'must-not-be-called',
+            },
+        })
+        reply = agent.chat('现在能过马路吗？', [traffic_light('red')], 'high')
+
+        self.assertIn('不要通行', reply)
+        self.assertNotIn('停在当前位置', reply)
+        self.assertEqual(agent.last_orchestration()['tools'], [])
+
     def test_agent_chat_bypasses_llm_for_red_light(self):
         agent = BlindGuardAgent({
             'enabled': True,

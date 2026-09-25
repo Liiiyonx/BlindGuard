@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1.0'>
+<title>BlindGuard 智能导盲系统</title>
+<link rel='icon' type='image/png' href='assets/icon_192.png'>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg-alt:#f8fafb;--text:#1a202c;--text-mute:#5a6872;--accent:#0ea78b;--accent-2:#0d9488;--hero-bg:#0f172a;--hero-text:#e2e8f0}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Helvetica Neue',sans-serif;color:var(--text);background:var(--bg);line-height:1.6}
+a{color:var(--accent-2);text-decoration:none}a:hover{text-decoration:underline}
+.hero{width:100%;min-height:85vh;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--hero-bg)}
+.hero::before{content:'';position:absolute;inset:0;background:url(assets/demo_ui_desktop.png) center/cover no-repeat;filter:brightness(0.3) saturate(0.7);z-index:1}
+.hero>*{position:relative;z-index:2}.hero-content{text-align:center;color:var(--hero-text);padding:2rem;max-width:780px}
+.hero-content h1{font-size:clamp(2.4rem,7vw,4.2rem);font-weight:800;letter-spacing:-0.02em;line-height:1.1;margin-bottom:0.6rem}
+.hero-content .tagline{font-size:clamp(1rem,2.5vw,1.4rem);opacity:.85;margin-bottom:1rem}
+.hero-content .sub{font-size:0.95rem;opacity:.65;margin-bottom:2rem}
+.hero-badges{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+.hero-badge{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:0.5rem 1.2rem;font-size:0.85rem;backdrop-filter:blur(4px)}
+.hero-badge strong{color:#5eead4}
+nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid #e2e8f0;padding:0 1.5rem}
+.nav-inner{max-width:1200px;margin:0 auto;display:flex;gap:1.5rem;overflow-x:auto;padding:0.75rem 0}
+.nav-inner a{white-space:nowrap;font-size:0.9rem;color:var(--text-mute);font-weight:500;padding:0.2rem 0;border-bottom:2px solid transparent;transition:.15s}
+.nav-inner a:hover{color:var(--accent-2);border-color:var(--accent-2);text-decoration:none}
+.section{padding:4rem 1.5rem}.section-inner{max-width:1200px;margin:0 auto}
+.section h2{font-size:1.8rem;font-weight:700;margin-bottom:0.4rem;color:var(--text)}
+.section .intro{color:var(--text-mute);margin-bottom:2.5rem;max-width:720px;font-size:1.05rem}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem}
+.metric{background:var(--bg-alt);border-radius:8px;padding:1.5rem;text-align:center;border:1px solid #e2e8f0}
+.metric .num{font-size:2.2rem;font-weight:800;color:var(--accent-2)}
+.metric .label{font-size:0.9rem;color:var(--text-mute);margin-top:0.3rem}
+.diagram-box{background:var(--bg-alt);border:1px solid #e2e8f0;border-radius:8px;padding:2rem;overflow-x:auto;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:0.88rem;line-height:1.5;white-space:pre;color:var(--text)}
+.row{display:flex;flex-wrap:wrap;gap:2rem;margin-top:1.5rem}.col{flex:1;min-width:280px}
+.col h3{font-size:1.1rem;font-weight:600;margin-bottom:0.8rem;color:var(--text)}
+.col ul{list-style:none;padding:0}.col li{padding:0.35rem 0;padding-left:1.2rem;position:relative;font-size:0.95rem;color:var(--text-mute)}
+.col li::before{content:'\25B8';position:absolute;left:0;color:var(--accent-2);font-weight:700}
+.table-wrap{overflow-x:auto;margin-top:1.5rem}
+table{width:100%;border-collapse:collapse;font-size:0.92rem}
+thead{background:var(--hero-bg);color:var(--hero-text)}
+th,td{padding:0.7rem 1rem;text-align:left;border-bottom:1px solid #e2e8f0}
+td{color:var(--text-mute)}tr:hover td{background:#f1f5f9}
+.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;margin-top:1.5rem}
+.gallery figure{margin:0;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;background:var(--bg-alt)}
+.gallery img{width:100%;display:block;height:auto;object-fit:cover}
+.gallery figcaption{padding:0.6rem 1rem;font-size:0.85rem;color:var(--text-mute)}
+.bg-alt{background:var(--bg-alt)}
+footer{padding:2rem 1.5rem;text-align:center;color:var(--text-mute);font-size:0.85rem;border-top:1px solid #e2e8f0}
+@media(max-width:640px){.hero{min-height:60vh}.section{padding:2.5rem 1rem}.hero-badges{gap:0.5rem}.hero-badge{padding:0.3rem 0.8rem}}
+</style>
+</head>
+<body>
+<section class='hero'>
+<div class='hero-content'>
+<h1>BlindGuard</h1>
+<p class='tagline'>主动式多模态导盲感知智能体</p>
+<p class='sub'>双模型检测 · 实时风险 · 红绿灯识别 · 工具编排 · 确定性安全护栏</p>
+<div class='hero-badges'>
+<span class='hero-badge'><strong>28.2</strong> FPS (RTX 5060)</span>
+<span class='hero-badge'><strong>10</strong> 角色 <strong>13</strong> 工具</span>
+<span class='hero-badge'><strong>66</strong> 项测试通过</span>
+<span class='hero-badge'>mAP50 <strong>55.7</strong></span>
+</div></div></section>
+<nav><div class='nav-inner'><a href='#overview'>概述</a><a href='#architecture'>架构</a><a href='#capabilities'>核心能力</a><a href='#agent'>智能体</a><a href='#metrics'>指标</a><a href='#screenshots'>截图</a></div></nav>
+<section class='section' id='overview'><div class='section-inner'>
+<h2>概述</h2>
+<p class='intro'>BlindGuard 是为视障人士设计的主动式导盲辅助系统，不同于 Seeing AI 等被动拍照模式。系统持续感知环境，按风险等级主动播报预警，针对中国道路定制了井盖、盲道等通用模型不识别的类别。</p>
+<div class='row'>
+<div class='col'><h3>创新点</h3><ul><li>双模型检测管线（通用 + 地面辅助）</li><li>HSV 纯 CV 红绿灯识别，零 API 成本</li><li>编排式多角色 Agent + 确定性安全护栏</li><li>离线降级 / LLM 熔断 / 模板兜底</li><li>IoU 跟踪目标接近/远离趋势</li></ul></div>
+<div class='col'><h3>技术栈</h3><ul><li>YOLOv10s 双模型 imgsz 960</li><li>PyTorch + Flask</li><li>OpenAI 兼容 LLM</li><li>浏览器 Web Speech TTS</li><li>Service Worker + PWA</li></ul></div>
+</div></div></section>
+<section class='section bg-alt' id='architecture'><div class='section-inner'>
+<h2>系统架构</h2>
+<p class='intro'>检测在独立管线线程中单实例运行，多浏览器客户端共享最新标注帧。</p>
+<div class='diagram-box'>摄像头/视频
+    |
+    v
++-------------+   +-------------+   +-------------+
+|  检测引擎    |-> | 红绿灯状态  |-> |  目标跟踪    |
+| YOLOv10s x2 |   | (HSV 识别)  |   | (趋势/轨迹) |
++------+------+   +------+------+   +------+------+
+       v                 v                 v
++---------------------------------------------------+
+|              风险评估器（风险 x 距离 x 位置）        |
++------------------------+--------------------------+
+                         v
+                 +---------------+
+                 |  场景分析器    |
+                 +-------+-------+
+                         v
++---------------------------------------------------+
+|    Agent Orchestrator（意图路由 + 有界角色编排）   |
+|    安全守门 / 感知 / 风险 / 导航 / 记忆 / 视觉    |
+|    偏好 / 沟通 / 播报 / 监控（共10个角色）         |
++------------------------+--------------------------+
+                         v
+           +-------------------------------+
+           |   确定性安全守门员复核          |
+           |   红灯/黄灯/高风险绕过 LLM     |
+           +-------------------------------+
+                         v
+                 +---------------+
+                 | VoiceAnnouncer|
+                 | 优先级队列    |
+                 +---------------+</div>
+</div></section>
+<section class='section' id='capabilities'><div class='section-inner'>
+<h2>核心能力</h2>
+<div class='metrics-grid'>
+<div class='metric'><div class='num'>7类</div><div class='label'>主模型：行人/车/红绿灯/自行车/摩托/公交/卡车</div></div>
+<div class='metric'><div class='num'>3类</div><div class='label'>辅助模型：井盖/公共设施/盲道</div></div>
+<div class='metric'><div class='num'>5级</div><div class='label'>风险评估：极高/高/中/低/安全</div></div>
+<div class='metric'><div class='num'>4种</div><div class='label'>场景：空旷/简单/复杂/拥挤/危险</div></div>
+<div class='metric'><div class='num'>HSV</div><div class='label'>红绿灯识别：红/黄/绿/未知（纯CV）</div></div>
+<div class='metric'><div class='num'>灵活</div><div class='label'>视频控制：暂停/进度/倍速</div></div>
+</div></div></section>
+<section class='section bg-alt' id='agent'><div class='section-inner'>
+<h2>智能体架构</h2>
+<p class='intro'>本地意图路由 + 有界工具编排 + 确定性安全守门员。LLM 负责理解与表达，通行授权由安全层拒绝。</p>
+<div class='row'>
+<div class='col'><h3>10 个专业角色</h3>
+<ul><li><strong>安全守门员</strong> — 覆盖 LLM 输出，不授权通行</li>
+<li><strong>实时感知员</strong> — 读取目标、方位、灯色</li>
+<li><strong>风险分析员</strong> — 风险排序、优先避让</li>
+<li><strong>无障碍导航员</strong> — 停步/减速建议</li>
+<li><strong>时序记忆员</strong> — 目标接近/远离/消失</li>
+<li><strong>视觉观察员</strong> — 按需调用 VLM 看图</li>
+<li><strong>偏好管家</strong> — 语速/播报详略持久化</li>
+<li><strong>沟通生成器</strong> — 工具结果压缩成回复</li>
+<li><strong>播报策略员</strong> — 紧急度/冷却/沉默</li>
+<li><strong>运行监控员</strong> — 模型/工具/降级状态</li></ul></div>
+<div class='col'><h3>13 个注册工具</h3>
+<ul><li>get_current_detections</li>
+<li>get_scene_overview</li>
+<li>get_temporal_memory</li>
+<li>get_risk_analysis</li>
+<li>get_navigation_guidance</li>
+<li>observe_image（VLM）</li>
+<li>get_user_preference</li>
+<li>set_user_preference</li>
+<li>get_system_health</li>
+<li>get_agent_capabilities</li>
+<li>get_announcement_history</li>
+<li>get_alert_policy</li></ul></div>
+</div></div></section>
+<section class='section' id='metrics'><div class='section-inner'>
+<h2>性能与指标</h2>
+<p class='intro'>RTX 5060 Laptop GPU 双模型配置（best_s.pt + best.pt，主960px + 辅640px，竖屏裁剪）。</p>
+<div class='metrics-grid'>
+<div class='metric'><div class='num'>28.2</div><div class='label'>FPS（300 帧实测）</div></div>
+<div class='metric'><div class='num'>22.5ms</div><div class='label'>管线中位延迟</div></div>
+<div class='metric'><div class='num'>55.7</div><div class='label'>mAP50 (BDD@960)</div></div>
+<div class='metric'><div class='num'>78.2%</div><div class='label'>真实红绿灯准确率</div></div>
+<div class='metric'><div class='num'>66</div><div class='label'>单元测试通过</div></div>
+<div class='metric'><div class='num'>100%</div><div class='label'>合成灯色自检</div></div>
+</div>
+<div class='table-wrap'><table>
+<thead><tr><th>阶段</th><th>性能细节</th></tr></thead>
+<tbody>
+<tr><td>管线端到端</td><td>均值 25.8ms / 中位 22.5ms / P95 27.5ms</td></tr>
+<tr><td>管线+JPEG编码</td><td>均值 29.9ms / 中位 26.5ms / P95 32.1ms</td></tr>
+<tr><td>安全护栏</td><td>红灯/黄灯/未知绕过LLM，绿灯不授权；危险回复拦截替换</td></tr>
+<tr><td>Agent 工具循环</td><td>Qwen2.5:3b 实测 12/12 通过</td></tr>
+<tr><td>在线 LLM</td><td>DeepSeek 已配置（余额不足），自动回退本地模板</td></tr>
+</tbody>
+</table></div>
+</div></section>
+<section class='section bg-alt' id='screenshots'><div class='section-inner'>
+<h2>界面截图</h2>
+<div class='gallery'>
+<figure><img src='assets/desktop_ui.png' alt='桌面端实时监控'><figcaption>桌面端实时监控</figcaption></figure>
+<figure><img src='assets/demo_ui_mobile.png' alt='移动端界面'><figcaption>移动端界面</figcaption></figure>
+<figure><img src='assets/mobile_ui.png' alt='移动端视频全屏'><figcaption>移动端视频播放</figcaption></figure>
+<figure><img src='assets/annotated_frame.jpg' alt='检测结果示例'><figcaption>检测结果：person 0.92 + car 0.71</figcaption></figure>
+</div></div></section>
+<footer><div class='section-inner'>BlindGuard 智能导盲系统 · 主动式多模态感知智能体 · 确定性安全辅助</div></footer>
+</body>
+</html>

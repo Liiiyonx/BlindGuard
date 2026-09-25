@@ -96,6 +96,21 @@ def main():
     # 最终回复
     assert reply == '前方检测到车辆和红灯，请保持等待。', f"回复异常: {reply}"
 
+    # 前端编排链路依赖的有界摘要必须与真实执行一致
+    orchestration = app_obj.agent.last_orchestration()
+    stage_names = [stage['stage'] for stage in orchestration['stages']]
+    assert stage_names == [
+        'routing', 'prefetch', 'specialists', 'llm', 'tool_loop', 'safety_review',
+    ], f"阶段轨迹异常: {stage_names}"
+    assert orchestration['intent'] == 'environment', \
+        f"意图异常: {orchestration['intent']}"
+    assert orchestration['lead_role_name'], '主责角色应有中文名'
+    assert orchestration['path_reason'], '决策依据必须解释真实走的路径'
+    assert orchestration['suggested_tools'], '摘要应带上建议工具'
+    assert orchestration['roles'], '摘要应包含角色协作结论'
+    assert orchestration['tools'], '摘要应包含工具轨迹'
+    assert orchestration['safety']['guard_passed'] is True, '安全复核应通过'
+
     # 红灯、高风险通行问题必须绕过 LLM，直接返回保守安全结论
     requests_before_safety_check = len(REQUESTS)
     safety_reply = app_obj.agent.chat('现在能过马路吗？')
@@ -103,6 +118,16 @@ def main():
         '红灯高风险问题不应继续请求 LLM'
     assert '红灯' in safety_reply and '不要通行' in safety_reply, \
         f"安全回复异常: {safety_reply}"
+
+    safety_orchestration = app_obj.agent.last_orchestration()
+    assert safety_orchestration['path'] == 'deterministic_safety', \
+        f"通行问题应走确定性安全路径: {safety_orchestration['path']}"
+    llm_stage = next(
+        stage for stage in safety_orchestration['stages']
+        if stage['stage'] == 'llm'
+    )
+    assert llm_stage['status'] == 'bypassed', \
+        f"通行问题不应进入模型推理: {llm_stage}"
 
     # 合法偏好意图走本地控制路径，不新增 LLM 请求。
     requests_before_preference = len(REQUESTS)

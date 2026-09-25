@@ -1271,6 +1271,104 @@ class BlindGuardAgent:
         """当前是否健康可用；已配置但调用失败时返回 False。"""
         return bool(self.llm_ok and not self._llm_degraded)
 
+    def last_orchestration(self) -> Dict:
+        """返回最近一次对话的编排摘要，供前端展示真实执行证据。
+
+        只暴露有界的展示字段：完整角色目录与调用审计仍走 /api/agent/status。
+        这里回传的是已发生的执行记录（阶段、角色、工具、安全复核），
+        不做任何重新推断或美化。
+        """
+        run = dict(self.orchestrator.last_run or {})
+        if not run:
+            return {}
+
+        role_names = {role.key: role.name for role in SPECIALISTS}
+        roles = []
+        for item in run.get('role_contributions') or []:
+            key = str(item.get('role') or '')
+            roles.append({
+                'role': key,
+                'name': str(item.get('name') or role_names.get(key, key)),
+                'status': str(item.get('status') or ''),
+                'tool': str(item.get('tool') or ''),
+                'summary': str(item.get('summary') or '')[:120],
+            })
+
+        tools = []
+        for call in run.get('tool_calls') or []:
+            tools.append({
+                'phase': str(call.get('phase') or ''),
+                'name': str(call.get('name') or ''),
+                'success': bool(call.get('success')),
+                'duration_ms': int(call.get('duration_ms') or 0),
+                'cache_hit': bool(call.get('cache_hit')),
+                'policy_denied': bool(call.get('policy_denied')),
+            })
+
+        lead_key = str(run.get('lead_role') or '')
+        return {
+            'intent': str(run.get('intent') or ''),
+            'intent_confidence': float(run.get('intent_confidence') or 0),
+            'intent_reason': str(run.get('intent_reason') or ''),
+            'suggested_tools': [
+                str(name) for name in (run.get('suggested_tools') or [])
+            ],
+            'lead_role': lead_key,
+            'lead_role_name': role_names.get(lead_key, lead_key),
+            'path': str(run.get('path') or ''),
+            'path_reason': str(run.get('path_reason') or ''),
+            'used_local_fallback': bool(run.get('used_local_fallback')),
+            'duration_ms': int(run.get('duration_ms') or 0),
+            'prefetch_tools': [
+                str(name) for name in (run.get('prefetch_tools') or [])
+            ],
+            'stages': [dict(stage) for stage in (run.get('stages') or [])],
+            'roles': roles,
+            'tools': tools,
+            'safety': dict(run.get('safety_review') or {}),
+            'raw_reply': str(run.get('raw_reply') or '')[:300],
+            'final_reply': str(run.get('sanitized_reply') or '')[:300],
+        }
+
+    def cockpit(self) -> Dict:
+        """返回智能体驾驶舱所需的只读快照：角色、工具能力与调用审计。
+
+        与 status() 分开，是因为驾驶舱按需拉取，不应进入前端 500ms 轮询。
+        这里只做只读汇总，不执行任何工具。
+        """
+        orchestration = self.orchestrator.snapshot()
+        last_run = dict(self.orchestrator.last_run or {})
+        role_status = {
+            str(item.get('role') or ''): str(item.get('status') or 'standby')
+            for item in (last_run.get('role_contributions') or [])
+        }
+        roles = []
+        for role in orchestration['roles']:
+            roles.append({
+                'key': role['key'],
+                'name': role['name'],
+                'description': role['description'],
+                'authority': role['authority'],
+                'preferred_tools': list(role['preferred_tools']),
+                'last_status': role_status.get(role['key'], 'idle'),
+            })
+        return {
+            'architecture': orchestration['architecture'],
+            'orchestrator_version': orchestration['version'],
+            'role_count': len(roles),
+            'tool_count': len(self.tool_registry.names),
+            'roles': roles,
+            'tools': self.tool_registry.capabilities(),
+            'recent_audit': self.tool_registry.recent_audit(10),
+            'denied_recent': sum(
+                1 for call in (last_run.get('tool_calls') or [])
+                if call.get('policy_denied')
+            ),
+            'max_model_tool_calls': orchestration['max_model_tool_calls'],
+            'max_specialist_roles': orchestration['max_specialist_roles'],
+            'last_run': self.last_orchestration(),
+        }
+
     def status(self) -> Dict:
         orchestration = self.orchestrator.snapshot()
         # 各共享结构计数在锁内一次性读取，避免与并发追加/清空交错

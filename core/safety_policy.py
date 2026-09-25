@@ -158,21 +158,64 @@ def evaluate_passage_question(user_message: str,
     )
 
 
-def enforce_reply_safety(user_message: str, reply: str,
-                         detections: Optional[Iterable[Dict]],
-                         risk_level: str = "safe") -> str:
-    """Post-process an LLM reply and remove any crossing authorization."""
+REPLY_ACTION_UNCHANGED = "unchanged"
+REPLY_ACTION_DISCLAIMER_APPENDED = "disclaimer_appended"
+REPLY_ACTION_REPLACED = "replaced"
+
+SAFETY_DISCLAIMER_SENTENCE = "。系统仅为辅助提示，不能确认可通行。"
+
+
+@dataclass(frozen=True)
+class ReplySafetyOutcome:
+    """确定性安全后处理的结果：动作类型、最终文本、追加的说明。
+
+    动作类型把“改了什么”变成可核对的证据：
+    - unchanged：原样返回，未改动；
+    - disclaimer_appended：保留原句，仅追加保守说明；
+    - replaced：原句含授权措辞，整句替换为确定性保守答复。
+    """
+
+    action: str
+    reply: str
+    appended: str = ""
+
+
+def review_reply_safety(user_message: str, reply: str,
+                        detections: Optional[Iterable[Dict]],
+                        risk_level: str = "safe") -> ReplySafetyOutcome:
+    """Post-process an LLM reply and report how it was changed."""
     detections = list(detections or [])
     cleaned = (reply or "").strip()
     if is_dangerous_approval(cleaned):
-        return passage_reply(detections, risk_level)
+        return ReplySafetyOutcome(
+            REPLY_ACTION_REPLACED,
+            passage_reply(detections, risk_level),
+        )
     if not has_passage_intent(user_message):
-        return cleaned
+        return ReplySafetyOutcome(REPLY_ACTION_UNCHANGED, cleaned)
     if not cleaned:
-        return passage_reply(detections, risk_level)
+        return ReplySafetyOutcome(
+            REPLY_ACTION_REPLACED,
+            passage_reply(detections, risk_level),
+        )
     if not SAFETY_DISCLAIMER.search(cleaned):
-        cleaned = cleaned.rstrip("。！! ") + "。系统仅为辅助提示，不能确认可通行。"
-    return cleaned
+        return ReplySafetyOutcome(
+            REPLY_ACTION_DISCLAIMER_APPENDED,
+            cleaned.rstrip("。！! ") + SAFETY_DISCLAIMER_SENTENCE,
+            SAFETY_DISCLAIMER_SENTENCE,
+        )
+    return ReplySafetyOutcome(REPLY_ACTION_UNCHANGED, cleaned)
+
+
+def enforce_reply_safety(user_message: str, reply: str,
+                         detections: Optional[Iterable[Dict]],
+                         risk_level: str = "safe") -> str:
+    """Post-process an LLM reply and remove any crossing authorization.
+
+    只返回最终文本；需要知道“改了什么”的调用方使用 review_reply_safety。
+    """
+    return review_reply_safety(
+        user_message, reply, detections, risk_level).reply
 
 
 def enforce_announcement_safety(text: str,
