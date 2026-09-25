@@ -12,6 +12,7 @@ import logging
 from typing import List, Dict, Optional
 from enum import Enum
 
+from core.geometry import POSITION_CENTER_ZONE, position_zone
 from core.labels import get_class_cn
 
 logger = logging.getLogger('BlindGuard.Risk')
@@ -42,32 +43,19 @@ class RiskEvaluator:
     }
 
     # 目标类别基础风险分值 (0-1)
+    #
+    # 优先级：本表 > _high/_medium/_low_risk_classes 三个集合（0.90/0.60/0.30）。
+    # 因此只需登记「需要单独定分」的类别；集合内的类别由集合统一分档，
+    # 在此重复登记会掩盖集合配置（历史上 car/truck/person 等条目即被集合覆盖而失效）。
+    # 可通过 config 的 risk.class_scores 覆盖本表。
     CLASS_RISK_SCORES = {
-        # 高风险目标 - 移动的车辆和行人
-        'car': 0.85,
-        'truck': 0.90,
-        'bus': 0.88,
-        'motorcycle': 0.80,
-        'bicycle': 0.70,
-        'person': 0.65,
-
-        # 中等风险目标 - 静止障碍物
+        # 名称与主模型类别表不一致的写法，保留以兼容不同数据集的标签
         'traffic light': 0.50,
-        'stop sign': 0.55,
-        'fire hydrant': 0.45,
-        'bench': 0.35,
-        'chair': 0.30,
         'pole': 0.40,
-
-        # 低风险目标
-        'dog': 0.55,
-        'cat': 0.40,
-        'bird': 0.20,
-        'umbrella': 0.25,
         'handbag': 0.15,
-        'suitcase': 0.20,
+        'bird': 0.20,
 
-        # 默认值
+        # 默认值：三个集合与上表都未命中的类别
         'default': 0.30
     }
 
@@ -82,9 +70,9 @@ class RiskEvaluator:
 
     # 位置区域定义 (基于画面宽度比例)
     POSITION_ZONES = {
-        'center': (0.25, 0.75),      # 中心区域
-        'left_near': (0.0, 0.25),    # 左侧近区
-        'right_near': (0.75, 1.0),   # 右侧近区
+        'center': POSITION_CENTER_ZONE,   # 中心区域
+        'left_near': (0.0, 0.25),         # 左侧近区
+        'right_near': (0.75, 1.0),        # 右侧近区
     }
 
     def __init__(self, risk_thresholds: Optional[Dict] = None,
@@ -256,8 +244,13 @@ class RiskEvaluator:
     def _calculate_class_risk(self, class_name: str) -> float:
         """
         计算目标类别风险分值
-        优先使用配置的风险类别，否则使用默认分值
+        优先使用显式登记的分值（可被 config 覆盖），否则按风险集合分档
         """
+        # 显式分值优先，保证 risk.class_scores 的覆盖真实生效
+        explicit = self.CLASS_RISK_SCORES.get(class_name)
+        if explicit is not None:
+            return explicit
+
         # 高风险类别
         if class_name in self._high_risk_classes:
             return 0.90
@@ -271,10 +264,7 @@ class RiskEvaluator:
             return 0.30
 
         # 使用默认分值
-        return self.CLASS_RISK_SCORES.get(
-            class_name,
-            self.CLASS_RISK_SCORES['default']
-        )
+        return self.CLASS_RISK_SCORES['default']
 
     def _calculate_distance_risk(self, area_ratio: float) -> float:
         """
@@ -341,16 +331,8 @@ class RiskEvaluator:
     def _determine_position_zone(self, center_x: float,
                                   frame_width: int) -> str:
         """确定位置区域"""
-        normalized_x = center_x / frame_width
-
-        center_start, center_end = self.POSITION_ZONES['center']
-
-        if center_start <= normalized_x <= center_end:
-            return 'center'
-        elif normalized_x < center_start:
-            return 'left'
-        else:
-            return 'right'
+        return position_zone(center_x / frame_width,
+                             self.POSITION_ZONES['center'])
 
     def _generate_warning(self, class_name: str, risk_level: RiskLevel,
                           distance_level: str, position_zone: str,

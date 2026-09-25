@@ -48,3 +48,18 @@ desktop.ini
 
 # Trae 本地规划与工作区数据
 .trae/
+
+# 本地答辩材料（仅本机使用，不入库）
+docs/演示脚本.md
+docs/答辩一页纸.html
+
+# 评测运行产物（按仓库约定不入库；evaluation/metrics_report.md 仍保留）
+evaluation/accessibility/
+evaluation/spotcheck/
+evaluation/agent_runtime_audit_*.json
+evaluation/autonomous_completion_report.md
+evaluation/camera_runtime_audit.json
+evaluation/camera_runtime_audit_frame.jpg
+evaluation/responsive_accessibility_audit.json
+evaluation/ui_button_audit.json
+evaluation/ui_button_audit.png

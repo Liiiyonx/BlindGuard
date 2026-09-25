@@ -32,6 +32,7 @@ from core.agent_orchestrator import (
 )
 from core.agent_tools import ToolRegistry
 from core.config_manager import ConfigManager
+from core.geometry import position_zone
 from core.labels import get_class_cn
 from core import safety_policy
 from core.traffic_light import STATE_CN
@@ -42,6 +43,8 @@ logger = logging.getLogger('BlindGuard.Agent')
 RISK_ORDER = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'safe': 4}
 
 TREND_CN = {'approaching': '正在接近', 'receding': '正在远离'}
+
+ZONE_CN = {'left': '左侧', 'center': '正前方', 'right': '右侧'}
 
 SYSTEM_PROMPT = (
     "你是 BlindGuard 智能导盲系统的核心助手，服务对象是视障人士。"
@@ -657,6 +660,8 @@ class BlindGuardAgent:
         if decision.is_passage_question:
             return decision.reply
         if not detections:
+            if self._detection_health_warning():
+                return '检测当前不可用，我无法确认周围情况。请停下脚步，用盲杖确认，不要凭本系统判断是否安全。'
             return '当前没有看到周围目标，请把摄像头对准环境后再问。'
 
         red = next((d for d in detections if d.get('light_state') == 'red'), None)
@@ -1263,11 +1268,7 @@ class BlindGuardAgent:
     def _zone(center_x: float, frame_w: int) -> str:
         if not frame_w:
             return '正前方'
-        if center_x < frame_w * 0.25:
-            return '左侧'
-        if center_x > frame_w * 0.75:
-            return '右侧'
-        return '正前方'
+        return ZONE_CN[position_zone(center_x / frame_w)]
 
     def _current_detections(self) -> List[Dict]:
         if self.context is not None and hasattr(self.context, 'get_detections'):
@@ -1284,6 +1285,38 @@ class BlindGuardAgent:
             except Exception:
                 pass
         return self._last_risk
+
+    def _detection_health(self) -> Optional[Dict]:
+        """检测推理健康；上下文未提供时返回 None（不编造健康状态）"""
+        if self.context is not None and hasattr(
+            self.context, 'get_detection_health'
+        ):
+            try:
+                return self.context.get_detection_health() or None
+            except Exception as e:
+                logger.warning(f"读取检测健康状态失败: {e}")
+        return None
+
+    def _detection_health_warning(self) -> str:
+        """推理异常时的提示前缀；健康时返回空串。
+
+        「无目标」与「推理失败」必须区分：否则空场景会被说成
+        “未检测到目标”，视障用户据此判断环境是危险的。
+        """
+        health = self._detection_health()
+        if not health or not health.get('degraded'):
+            return ''
+        engines = health.get('engines') or []
+        worst = max(
+            (int(e.get('consecutive_errors', 0)) for e in engines), default=0
+        )
+        reasons = [e.get('last_error') for e in engines if e.get('last_error')]
+        reason = reasons[-1] if reasons else '未知原因'
+        return (
+            f"【检测引擎异常】最近连续 {worst} 帧推理失败（{reason}）。"
+            "以下检测结果可能不完整或为空，不能据此认定周围没有目标，"
+            "也不能据此给出任何通行结论；请如实告知用户系统感知异常。\n"
+        )
 
     def _preferences(self) -> Dict:
         if self.context is not None and hasattr(self.context, 'get_preferences'):
@@ -1414,6 +1447,7 @@ class BlindGuardAgent:
             'llm_active': self.llm_available(),
             'fallback_active': bool(self.enabled and not self.llm_available()),
             'last_error': self._last_error,
+            'detection_health': self._detection_health(),
             'model': self.model if self.llm_available() else '本地回退',
             'tools_supported': self.tools_supported,
             'architecture': orchestration['architecture'],

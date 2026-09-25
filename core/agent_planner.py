@@ -23,6 +23,8 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence
 
+from core.labels import TRAFFIC_LIGHT_CLASSES
+
 logger = logging.getLogger("BlindGuard.Agent.Planner")
 
 # 可被 LLM 指派执行的角色白名单。排除项及原因：
@@ -52,7 +54,6 @@ _ROLE_BRIEFS = {
 
 _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
 _CODE_FENCE = re.compile(r"```(?:json)?", re.IGNORECASE)
-TRAFFIC_LIGHT_CLASSES = ("traffic_light", "traffic light")
 
 
 @dataclass(frozen=True)

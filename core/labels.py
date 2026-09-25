@@ -7,6 +7,10 @@
 config.yaml 的 class_mapping 在应用装配时传入各模块作为覆盖项。
 """
 
+# 红绿灯类别在不同数据集中的两种写法：主模型 best.pt 用下划线，
+# 通用/COCO 系模型用空格。判定处统一引用这里，避免各写一份。
+TRAFFIC_LIGHT_CLASSES = ('traffic_light', 'traffic light')
+
 CLASS_NAME_CN = {
     # BlindGuard 自定义训练类别（best.pt，下划线命名）
     'manhole_cover': '井盖',

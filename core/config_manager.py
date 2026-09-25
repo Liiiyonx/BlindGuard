@@ -88,16 +88,17 @@ class ConfigManager:
         },
 
         # 风险评估配置
+        # thresholds 即距离/面积阈值本身（与 config.yaml 的
+        # risk_engine.area_thresholds、risk.thresholds.very_close 同一形状）；
+        # class_scores 为类别分值覆盖表，形如 {'traffic light': 0.5}
         'risk': {
             'thresholds': {
-                'class_scores': {},
-                'distance': {
-                    'very_close': 0.20,
-                    'close': 0.10,
-                    'medium': 0.04,
-                    'far': 0.01
-                }
-            }
+                'very_close': 0.20,
+                'close': 0.10,
+                'medium': 0.04,
+                'far': 0.01
+            },
+            'class_scores': {}
         },
 
         # 语音配置
@@ -301,6 +302,7 @@ class ConfigManager:
             risk_engine = config['risk_engine']
             config['risk'] = {
                 'thresholds': risk_engine.get('area_thresholds', {}),
+                'class_scores': risk_engine.get('class_scores', {}),
                 'high_risk_classes': risk_engine.get('high_risk_classes', []),
                 'medium_risk_classes': risk_engine.get('medium_risk_classes', []),
                 'low_risk_classes': risk_engine.get('low_risk_classes', [])

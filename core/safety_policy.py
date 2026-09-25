@@ -10,8 +10,7 @@ import re
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional
 
-
-TRAFFIC_LIGHT_CLASSES = {"traffic_light", "traffic light"}
+from core.labels import TRAFFIC_LIGHT_CLASSES
 
 PASSAGE_INTENT_PATTERNS = (
     re.compile(r"(?:能不能|能否|可不可以|可以|能|是否).{0,4}(?:过马路|过街|通行|通过|过去|走)"),

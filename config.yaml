@@ -47,6 +47,10 @@ risk_engine:
     medium: 0.05            # >= 5% 视为中等距离
     far: 0.01               # >= 1% 视为较远，更低为非常远
 
+  # 可选：类别风险分值覆盖（优先级高于下面三个风险集合，需显式登记才生效）
+  # class_scores:
+  #   "traffic light": 0.5
+
   # 危险等级：high=高危, medium=中等, low=低危, safe=安全
   # 高危类别（靠近即危险）
   high_risk_classes:
@@ -136,8 +140,8 @@ agent:
     max_specialist_roles: 3         # 每轮最多执行的主责与协作角色数量
     enable_llm_planner: true        # 规则路由未命中（intent=general）时，由 LLM 决定参与角色；
                                     # 只决定角色、不决定工具，通行问题与已降级时不启用
-    llm_planner_timeout: 8.0        # 规划调用的独立超时（秒）；本地 3B 模型实测需 5-8 秒，
-                                    # 失败静默回落规则计划且不计入熔断
+    llm_planner_timeout: 8.0        # 规划调用的独立超时（秒）；线上端点实测 1-2 秒，
+                                    # 留余量应对网络抖动。失败静默回落规则计划且不计入熔断
 
 # 日志配置
 logger:

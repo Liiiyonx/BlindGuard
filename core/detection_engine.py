@@ -55,6 +55,14 @@ class DetectionEngine:
         self.inference_times = []
         self.total_frames = 0
 
+        # 推理健康状态：让「模型故障」与「画面确实没有目标」可区分。
+        # 导盲场景下静默失效比崩溃更危险——下游会把推理失败当成空场景，
+        # 平静地告诉用户“未检测到目标”。因此这里显式记账并对外透出。
+        self.last_error = ''
+        self.last_error_at = 0.0
+        self.total_errors = 0
+        self.consecutive_errors = 0
+
         # 自动加载模型
         self._load_model()
 
@@ -105,6 +113,7 @@ class DetectionEngine:
         """
         if not self.is_loaded:
             logger.warning("模型未加载，无法执行检测")
+            self._record_error('模型未加载')
             return []
 
         if frame is None or frame.size == 0:
@@ -133,11 +142,42 @@ class DetectionEngine:
                 self.inference_times.pop(0)
             self.total_frames += 1
 
+            # 本次推理成功，清空连续失败计数（累计失败数保留供审计）
+            self.consecutive_errors = 0
+
             return detections
 
         except Exception as e:
             logger.error(f"检测推理失败: {e}")
+            self._record_error(str(e))
             return []
+
+    def _record_error(self, message: str) -> None:
+        """记录一次推理失败（供健康状态暴露，不改变 detect 的返回值契约）"""
+        self.last_error = str(message)
+        self.last_error_at = time.time()
+        self.total_errors += 1
+        self.consecutive_errors += 1
+
+    def reset_health(self) -> None:
+        """清除推理异常计数（切换视频/摄像头等数据源时调用）"""
+        self.last_error = ''
+        self.last_error_at = 0.0
+        self.total_errors = 0
+        self.consecutive_errors = 0
+
+    def status(self) -> Dict:
+        """推理健康摘要，供状态接口与智能体健康工具透出"""
+        return {
+            'loaded': self.is_loaded,
+            'model_path': self.model_path,
+            'total_frames': self.total_frames,
+            'total_errors': self.total_errors,
+            'consecutive_errors': self.consecutive_errors,
+            'last_error': self.last_error,
+            'last_error_at': self.last_error_at,
+            'degraded': self.consecutive_errors > 0 or not self.is_loaded,
+        }
 
     def _parse_results(self, results, frame_shape: Tuple) -> List[Dict]:
         """解析模型输出"""

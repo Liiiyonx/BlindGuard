@@ -15,27 +15,13 @@
 import time
 from collections import deque
 
+from core.geometry import box_iou
+
 TREND_CN = {
     'approaching': '正在接近',
     'receding': '正在远离',
     'stable': '',
 }
-
-
-def _iou(box_a, box_b):
-    """计算两个 [x1,y1,x2,y2] 框的 IoU"""
-    ax1, ay1, ax2, ay2 = box_a[0], box_a[1], box_a[2], box_a[3]
-    bx1, by1, bx2, by2 = box_b[0], box_b[1], box_b[2], box_b[3]
-    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
-    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
-    iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
-    inter = iw * ih
-    if inter <= 0:
-        return 0.0
-    area_a = max(0, ax2 - ax1) * max(0, ay2 - ay1)
-    area_b = max(0, bx2 - bx1) * max(0, by2 - by1)
-    union = area_a + area_b - inter
-    return inter / union if union > 0 else 0.0
 
 
 class SimpleTracker:
@@ -84,7 +70,7 @@ class SimpleTracker:
             for tr in self._tracks.values():
                 if tr['class_name'] != cls or tr['id'] in matched_ids:
                     continue
-                iou = _iou(bbox, tr['bbox'])
+                iou = box_iou(bbox, tr['bbox'])
                 if iou > best_iou:
                     best, best_iou = tr, iou
 

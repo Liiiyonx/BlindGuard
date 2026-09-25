@@ -541,6 +541,7 @@ class AgentOrchestrator:
             f"{'、'.join(plan.supporting_roles) or '无'}\n"
             f"建议工具：{suggested}\n"
             f"{team_text}"
+            f"{self.agent._detection_health_warning()}"
             f"当前环境检测结果：\n{det_text}\n"
             f"最近记忆：\n{self.agent._memory_text()}\n"
             f"{prefetch_text}"

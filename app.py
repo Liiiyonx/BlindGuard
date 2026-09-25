@@ -194,7 +194,10 @@ class BlindGuardApp:
         # 风险评估器（yaml 的 area_thresholds 对应 RiskEvaluator 的 distance 阈值）
         risk_cfg = self.config.get_section('risk')
         self.risk = RiskEvaluator(
-            risk_thresholds={'distance': risk_cfg.get('thresholds', {})},
+            risk_thresholds={
+                'distance': risk_cfg.get('thresholds', {}),
+                'class_scores': risk_cfg.get('class_scores', {}),
+            },
             high_risk_classes=risk_cfg.get('high_risk_classes'),
             medium_risk_classes=risk_cfg.get('medium_risk_classes'),
             low_risk_classes=risk_cfg.get('low_risk_classes'),
@@ -267,6 +270,8 @@ class BlindGuardApp:
         self.last_message = "系统就绪，请启动系统开始检测"
         self.overall_risk = 'safe'
         # 播报事件时间线（Frigate 式事件流：供前端时间线面板回看）
+        # 读路径必须持 _runtime_lock 取 list 快照：状态接口被前端 500ms 轮询，
+        # 与检测/播报线程的 append 并发时会抛 deque mutated during iteration
         self.events = deque(maxlen=50)
         self.events.append({'time': time.strftime('%H:%M:%S'),
                             'text': '系统就绪', 'level': 'safe'})
@@ -351,6 +356,15 @@ class BlindGuardApp:
 
     def get_overall_risk(self):
         return self.overall_risk
+
+    def get_detection_health(self):
+        """检测推理健康（供智能体区分“模型故障”与“画面确实没有目标”）"""
+        engines = [e for e in (self.detector, self.aux_detector) if e is not None]
+        healths = [e.status() for e in engines]
+        return {
+            'degraded': any(h['degraded'] for h in healths),
+            'engines': healths,
+        }
 
     def get_scene(self):
         """瘦身的场景信息（剔除重量级 detections 列表）"""
@@ -526,6 +540,10 @@ class BlindGuardApp:
             self.fps = 0
             self.last_speak_time = 0
             self.last_announce_latency_ms = None
+            # 数据源切换后旧的推理失败计数不再代表当前源
+            for engine in (self.detector, self.aux_detector):
+                if engine is not None:
+                    engine.reset_health()
             with self.media_lock:
                 self._latest_jpeg = None
                 self._latest_raw = None
@@ -568,6 +586,8 @@ class BlindGuardApp:
             total = int(self.video_cap.get(cv2.CAP_PROP_FRAME_COUNT)) if self.video_cap else 0
         with self.detections_lock:
             det_count = len(self.detections)
+        with self._runtime_lock:
+            recent_events = list(self.events)[-8:][::-1]
         return jsonify({
             'running': self.running,
             'camera_active': self.camera_active,
@@ -582,7 +602,8 @@ class BlindGuardApp:
             'scene_type': self.scene_info.get('scene_type', ''),
             'scene_type_cn': self.scene_info.get('scene_type_cn', ''),
             'last_message': self.last_message,
-            'events': list(self.events)[-8:][::-1],
+            'events': recent_events,
+            'detection_health': self.get_detection_health(),
             'frame_w': self._frame_size[0],
             'frame_h': self._frame_size[1],
         })
@@ -604,11 +625,12 @@ class BlindGuardApp:
         self._stop_camera()
         self._reset_analysis_state()
         self.last_message = "摄像头已关闭"
-        self.events.append({
-            'time': time.strftime('%H:%M:%S'),
-            'text': self.last_message,
-            'level': 'safe',
-        })
+        with self._runtime_lock:
+            self.events.append({
+                'time': time.strftime('%H:%M:%S'),
+                'text': self.last_message,
+                'level': 'safe',
+            })
         self.voice.speak_system("摄像头已关闭")
         return jsonify({'success': True, 'message': '摄像头已关闭'})
 
@@ -695,11 +717,12 @@ class BlindGuardApp:
         self._stop_video()
         self._reset_analysis_state()
         self.last_message = "视频播放已停止"
-        self.events.append({
-            'time': time.strftime('%H:%M:%S'),
-            'text': self.last_message,
-            'level': 'safe',
-        })
+        with self._runtime_lock:
+            self.events.append({
+                'time': time.strftime('%H:%M:%S'),
+                'text': self.last_message,
+                'level': 'safe',
+            })
         self.voice.speak_system("视频播放已停止")
         return jsonify({'success': True, 'message': '视频已停止'})
 

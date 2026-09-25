@@ -38,6 +38,8 @@ import argparse
 import statistics
 from datetime import datetime
 
+from core.geometry import box_iou
+
 REPORT_PATH = os.path.join('evaluation', 'metrics_report.md')
 
 
@@ -112,7 +114,10 @@ def _build_production_pipeline(config):
 
     risk_cfg = config.get_section('risk')
     risk = RiskEvaluator(
-        risk_thresholds={'distance': risk_cfg.get('thresholds', {})},
+        risk_thresholds={
+            'distance': risk_cfg.get('thresholds', {}),
+            'class_scores': risk_cfg.get('class_scores', {}),
+        },
         high_risk_classes=risk_cfg.get('high_risk_classes'),
         medium_risk_classes=risk_cfg.get('medium_risk_classes'),
         low_risk_classes=risk_cfg.get('low_risk_classes'),
@@ -585,19 +590,6 @@ def _normalize_boxes(items):
             'light_state': item.get('light_state'),
         })
     return result
-
-
-def box_iou(a, b) -> float:
-    """两个 [x1, y1, x2, y2] 框的 IoU。"""
-    ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
-    ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
-    intersection = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
-    if intersection <= 0:
-        return 0.0
-    area_a = max(0.0, a[2] - a[0]) * max(0.0, a[3] - a[1])
-    area_b = max(0.0, b[2] - b[0]) * max(0.0, b[3] - b[1])
-    union = area_a + area_b - intersection
-    return intersection / union if union > 0 else 0.0
 
 
 def match_frame(gt_boxes, predictions, iou_threshold: float = 0.5):

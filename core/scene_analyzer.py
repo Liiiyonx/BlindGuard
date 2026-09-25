@@ -12,6 +12,7 @@ import logging
 from typing import List, Dict, Optional
 from collections import Counter
 
+from core.geometry import position_zone
 from core.labels import get_class_cn
 
 logger = logging.getLogger('BlindGuard.Scene')
@@ -187,9 +188,10 @@ class SceneAnalyzer:
             # 计算归一化位置
             normalized_x = center_x / frame_width
 
-            if normalized_x < 0.25:
+            zone = position_zone(normalized_x)
+            if zone == 'left':
                 left_count += 1
-            elif normalized_x < 0.75:
+            elif zone == 'center':
                 center_count += 1
             else:
                 right_count += 1

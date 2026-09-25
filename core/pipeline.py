@@ -4,9 +4,9 @@
 import time
 from typing import Dict, Iterable, List, Optional
 
+from core.geometry import box_iou
+from core.labels import TRAFFIC_LIGHT_CLASSES
 from core.traffic_light import STATE_CN
-
-TRAFFIC_LIGHT_CLASSES = ("traffic_light", "traffic light")
 
 
 def class_ids_for(detector, class_names: Optional[Iterable[str]]) -> Optional[List[int]]:
@@ -137,18 +137,6 @@ class DetectionPipeline:
                 det["center"] = (center[0], center[1] + crop_top)
             det["area_ratio"] = det.get("area_ratio", 0) * area_scale
 
-    @staticmethod
-    def _box_iou(a, b) -> float:
-        ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
-        ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
-        intersection = max(0, ix2 - ix1) * max(0, iy2 - iy1)
-        if intersection <= 0:
-            return 0.0
-        area_a = max(0, a[2] - a[0]) * max(0, a[3] - a[1])
-        area_b = max(0, b[2] - b[0]) * max(0, b[3] - b[1])
-        union = area_a + area_b - intersection
-        return intersection / union if union > 0 else 0.0
-
     def _merge_detections(self, main_detections: List[Dict],
                           aux_detections: List[Dict]) -> List[Dict]:
         """Keep main-model boxes first and add non-duplicate aux detections."""
@@ -156,7 +144,7 @@ class DetectionPipeline:
         for aux in aux_detections:
             duplicate = any(
                 main.get("class_name") == aux.get("class_name")
-                and self._box_iou(main.get("bbox", []), aux.get("bbox", [])) > 0.55
+                and box_iou(main.get("bbox", []), aux.get("bbox", [])) > 0.55
                 for main in main_detections
             )
             if not duplicate:
