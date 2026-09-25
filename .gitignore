@@ -45,3 +45,6 @@ desktop.ini
 
 # Claude Code 本地会话数据
 .claude/
+
+# Trae 本地规划与工作区数据
+.trae/

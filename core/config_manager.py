@@ -81,7 +81,9 @@ class ConfigManager:
                 'enable_intent_planner': True,
                 'enable_tool_prefetch': True,
                 'enable_specialist_team': True,
-                'max_specialist_roles': 3
+                'max_specialist_roles': 3,
+                'enable_llm_planner': True,
+                'llm_planner_timeout': 8.0,
             }
         },
 

@@ -1607,6 +1607,18 @@
             white-space: nowrap;
         }
 
+        .trace-chip.alert {
+            background: rgba(255, 59, 48, 0.14);
+            color: #a1221a;
+        }
+
+        /* 规划来源为 LLM 时用品牌绿突出：这是"规则没认出、模型参与分解"的标志 */
+        .trace-chip.is-llm {
+            background: rgba(52, 199, 89, 0.18);
+            color: #187a35;
+            font-weight: 600;
+        }
+
         .trace-stages {
             display: flex;
             flex-wrap: wrap;
@@ -1744,6 +1756,11 @@
             background: #2c2c2e !important;
             border-color: #8e8e93 !important;
             color: #ffffff !important;
+        }
+
+        body.hc .trace-chip.is-llm {
+            background: #004d26 !important;
+            color: #30d158 !important;
         }
 
         body.hc .trace-toggle {
@@ -2772,6 +2789,10 @@
             llm_context: '模型上下文',
             llm_tool_loop: '模型工具循环'
         };
+        const PLAN_SOURCE_LABELS = {
+            rules: '规则',
+            llm: 'LLM'
+        };
         const ROLE_STATUS_LABELS = {
             completed: '已执行',
             standby: '待命',
@@ -2909,6 +2930,11 @@
             }
             const pathLabel = PATH_LABELS[data.path] || data.path;
             if (pathLabel) head.appendChild(traceEl('span', 'trace-chip', pathLabel));
+            const planSource = String((data.planning && data.planning.source)
+                || data.plan_source || 'rules');
+            head.appendChild(traceEl(
+                'span', 'trace-chip' + (planSource === 'llm' ? ' is-llm' : ''),
+                '规划 ' + (PLAN_SOURCE_LABELS[planSource] || planSource)));
             if (data.used_local_fallback) {
                 head.appendChild(traceEl('span', 'trace-flag', '模型未应答，本地兜底'));
             }
@@ -2937,6 +2963,21 @@
             if (basis.length) {
                 wrap.appendChild(traceEl(
                     'div', 'trace-note', '决策依据：' + basis.join('；')));
+            }
+
+            // 规则没认出意图时由 LLM 做任务分解，这里展示它给出的理由与指派
+            const planning = data.planning || {};
+            if (planSource === 'llm' && planning.rationale) {
+                const planBasis = ['规划依据：' + String(planning.rationale)];
+                if (Array.isArray(planning.roles) && planning.roles.length) {
+                    planBasis.push('指派角色 ' + planning.roles.join('、'));
+                }
+                const dropped = Array.isArray(planning.dropped)
+                    ? planning.dropped : [];
+                if (dropped.length) {
+                    planBasis.push('已丢弃 ' + dropped.length + ' 项无效指派');
+                }
+                wrap.appendChild(traceEl('div', 'trace-note', planBasis.join('；')));
             }
 
             const roles = Array.isArray(data.roles) ? data.roles : [];

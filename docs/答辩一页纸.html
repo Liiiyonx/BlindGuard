@@ -144,7 +144,7 @@
     <div class="kpi"><b>10</b><span>专业角色，各自声明职责与权限边界</span></div>
     <div class="kpi"><b>13</b><span>统一注册工具：校验 / 限权 / 限时 / 审计</span></div>
     <div class="kpi"><b>6</b><span>阶段轨迹，逐轮可核对</span></div>
-    <div class="kpi"><b>87</b><span>项回归测试全部通过</span></div>
+    <div class="kpi"><b>104</b><span>项回归测试全部通过</span></div>
   </div>
 
   <div class="cols">
@@ -153,6 +153,7 @@
       <h2>智能体：编排式专业团队 + 确定性安全守门员</h2>
       <ul>
         <li><b>本地意图路由</b>覆盖 7 类意图，进入模型前最多预取 2 个本地只读工具</li>
+        <li><b>LLM 角色规划</b>：规则未命中（<code>intent=general</code>）时由模型做任务分解，只决定参与角色与理由；<b>只决定角色、不决定工具</b>，工具由角色表推导，证据与实际执行天然一致。通行问题 / 路由关闭 / 已降级时一律不规划，规划调用独立超时且<b>不计入熔断</b>，失败静默回落规则计划</li>
         <li><b>角色执行</b>：主责与协作角色（最多 3 个）各执行 1 个只读工具，产出结构化结论写入 <code>role_contributions</code></li>
         <li><b>工具注册表</b>统一做 JSON Schema 校验、读写权限、安全级别、超时控制与最近 100 次调用审计</li>
         <li><b>模型工具预算</b>：最多 3 轮、累计 6 次；写工具仅限偏好意图，外部视觉仅限明确视觉意图，每次对话最多 1 次</li>
@@ -183,8 +184,8 @@
       <tbody>
         <tr>
           <td><code>python -m unittest discover -s tests</code></td>
-          <td class="r ok">87 / 87 通过</td>
-          <td>编排架构、角色执行、模型工具权限、安全护栏、端到端匹配算法、前端静态约束、数据授权审核</td>
+          <td class="r ok">104 / 104 通过</td>
+          <td>编排架构、LLM 角色规划、模型工具权限、安全护栏、端到端匹配算法、前端静态约束、数据授权审核</td>
         </tr>
         <tr>
           <td><code>python smoke_test.py</code></td>
@@ -199,7 +200,7 @@
         <tr>
           <td><code>python scripts/agent_runtime_audit.py --model qwen2.5:3b …</code></td>
           <td class="r ok">12 / 12 通过</td>
-          <td>真实本地端点：工具协议、工具闭环、安全护栏、角色执行、权限策略、轨迹准确性<br><code>evaluation/agent_runtime_audit_local.json</code>（2026-09-22）</td>
+          <td>真实本地端点：工具协议、工具闭环、安全护栏、角色执行、权限策略、轨迹准确性<br><code>evaluation/agent_runtime_audit_local.json</code>（2026-09-25）</td>
         </tr>
         <tr>
           <td><code>python evaluate.py perf --source uploads/video.mp4 --frames 300</code></td>

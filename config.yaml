@@ -134,6 +134,10 @@ agent:
     enable_tool_prefetch: true      # LLM 调用前预取有界本地只读工具，降低幻觉
     enable_specialist_team: true    # 主责/协作角色基于工具证据产出结构化结论
     max_specialist_roles: 3         # 每轮最多执行的主责与协作角色数量
+    enable_llm_planner: true        # 规则路由未命中（intent=general）时，由 LLM 决定参与角色；
+                                    # 只决定角色、不决定工具，通行问题与已降级时不启用
+    llm_planner_timeout: 8.0        # 规划调用的独立超时（秒）；本地 3B 模型实测需 5-8 秒，
+                                    # 失败静默回落规则计划且不计入熔断
 
 # 日志配置
 logger:

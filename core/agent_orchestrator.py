@@ -10,10 +10,11 @@ import json
 import re
 import time
 from collections import deque
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Dict, List, Optional, Sequence
 
 from core import safety_policy
+from core.agent_planner import LLMPlanner
 from core.agent_tools import ToolResult
 
 RISK_ORDER = {
@@ -148,6 +149,9 @@ class IntentPlan:
     suggested_tools: Sequence[str]
     prefetch_tools: Sequence[str]
     reason: str
+    # "rules"（本地正则路由）或 "llm"（规则未命中时由 LLM 规划角色）。
+    # 默认值保证既有构造点与测试不受影响。
+    plan_source: str = "rules"
 
     def as_dict(self) -> Dict:
         data = asdict(self)
@@ -377,7 +381,7 @@ class AgentOrchestrator:
 
     def __init__(self, agent, *, max_tool_rounds: int = 3,
                  trace_size: int = 80, max_model_tool_calls: int = 6,
-                 max_specialist_roles: int = 3):
+                 max_specialist_roles: int = 3, llm_planner_timeout: float = 8.0):
         self.agent = agent
         self.router = IntentRouter()
         self.max_tool_rounds = max(1, int(max_tool_rounds))
@@ -389,6 +393,46 @@ class AgentOrchestrator:
         self.intent_planner_enabled = True
         self.tool_prefetch_enabled = True
         self.specialist_execution_enabled = True
+        # 规则路由未命中时，由 LLM 决定参与角色；只产出角色，工具由角色表推导
+        self.llm_planner_enabled = True
+        self.planner = LLMPlanner(
+            agent,
+            max_roles=self.max_specialist_roles,
+            timeout=llm_planner_timeout,
+        )
+
+    def _should_plan(self, plan: IntentPlan, verdict) -> bool:
+        """是否让 LLM 参与本轮任务分解。
+
+        三道硬门缺一不可：
+        - 通行问题永不规划（绿灯+中风险不会被安全旁路，若放行会稀释
+          "通行问题必带风险证据"这条契约）；
+        - 规则路由必须处于启用状态（关闭意图路由时 chat() 会内联构造
+          general/0.5 计划，不加这道门等于"关掉路由反而打开最激进的一条路"）；
+        - 模型当前必须可用（已降级时不再额外发起调用）。
+        """
+        if not self.llm_planner_enabled:
+            return False
+        if not self.intent_planner_enabled:
+            return False
+        if getattr(verdict, "is_passage_question", False):
+            return False
+        if plan.intent != "general":
+            return False
+        return bool(self.agent.llm_available())
+
+    def _apply_role_plan(self, plan: IntentPlan, role_plan):
+        """把 LLM 的角色计划合并进规则计划。
+
+        只覆盖 lead_role / supporting_roles：工具仍由角色表推导，
+        intent、confidence、prefetch_tools、suggested_tools 保持规则原值。
+        """
+        return replace(
+            plan,
+            lead_role=role_plan.lead_role,
+            supporting_roles=tuple(role_plan.supporting_roles),
+            plan_source="llm",
+        )
 
     def chat(
         self,
@@ -466,6 +510,20 @@ class AgentOrchestrator:
                 path="local_fallback",
                 started=started,
             )
+
+        # 规则没认出的请求才交给 LLM 做任务分解；失败一律保留规则计划。
+        planning = {"source": "rules", "rationale": "", "roles": [], "dropped": []}
+        if self._should_plan(plan, decision):
+            role_plan = self.planner.propose(
+                user_message, detections, risk_level, plan)
+            if role_plan is not None:
+                plan = self._apply_role_plan(plan, role_plan)
+                planning = {
+                    "source": "llm",
+                    "rationale": role_plan.rationale,
+                    "roles": list(role_plan.roles),
+                    "dropped": [list(item) for item in role_plan.dropped],
+                }
 
         det_text = (
             self.agent._format_detections(detections, frame_w)
@@ -587,6 +645,7 @@ class AgentOrchestrator:
             plan=plan,
             calls=calls,
             role_contributions=role_contributions,
+            planning=planning,
             path=(
                 "llm_tool_loop"
                 if any(call.get("phase") == "model" for call in calls)
@@ -1159,6 +1218,7 @@ class AgentOrchestrator:
         plan: IntentPlan,
         calls: List[Dict],
         role_contributions: Optional[List[Dict]] = None,
+        planning: Optional[Dict] = None,
         path: str,
         used_local_fallback: bool = False,
         started: float,
@@ -1209,6 +1269,8 @@ class AgentOrchestrator:
                 "status": "completed",
                 "intent": plan.intent,
                 "lead_role": plan.lead_role,
+                # 规划来源并入既有 routing 阶段：阶段数量与顺序保持不变
+                "plan_source": plan.plan_source,
             },
             {
                 "stage": "prefetch",
@@ -1255,6 +1317,8 @@ class AgentOrchestrator:
             "lead_role": plan.lead_role,
             "supporting_roles": list(plan.supporting_roles),
             "suggested_tools": list(plan.suggested_tools),
+            "plan_source": plan.plan_source,
+            "planning": dict(planning or {"source": "rules"}),
             "duration_ms": max(
                 0, round((time.perf_counter() - started) * 1000)
             ),

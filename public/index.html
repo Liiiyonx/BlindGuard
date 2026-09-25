@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang='zh-CN'>
 <head>
 <meta charset='UTF-8'>
@@ -59,7 +59,7 @@ footer{padding:2rem 1.5rem;text-align:center;color:var(--text-mute);font-size:0.
 <div class='hero-badges'>
 <span class='hero-badge'><strong>28.2</strong> FPS (RTX 5060)</span>
 <span class='hero-badge'><strong>10</strong> 角色 <strong>13</strong> 工具</span>
-<span class='hero-badge'><strong>66</strong> 项测试通过</span>
+<span class='hero-badge'><strong>104</strong> 项测试通过</span>
 <span class='hero-badge'>mAP50 <strong>55.7</strong></span>
 </div></div></section>
 <nav><div class='nav-inner'><a href='#overview'>概述</a><a href='#architecture'>架构</a><a href='#capabilities'>核心能力</a><a href='#agent'>智能体</a><a href='#metrics'>指标</a><a href='#screenshots'>截图</a></div></nav>
@@ -90,9 +90,10 @@ footer{padding:2rem 1.5rem;text-align:center;color:var(--text-mute);font-size:0.
                  +-------+-------+
                          v
 +---------------------------------------------------+
-|    Agent Orchestrator（意图路由 + 有界角色编排）   |
-|    安全守门 / 感知 / 风险 / 导航 / 记忆 / 视觉    |
-|    偏好 / 沟通 / 播报 / 监控（共10个角色）         |
+|  Agent Orchestrator（意图路由 + LLM 角色规划）      |
+|  安全守门 / 感知 / 风险 / 导航 / 记忆 / 视觉       |
+|  偏好 / 沟通 / 播报 / 监控（共10个角色）           |
+|  规则未命中时：模型决定参与角色，不决定工具        |
 +------------------------+--------------------------+
                          v
            +-------------------------------+
@@ -117,7 +118,7 @@ footer{padding:2rem 1.5rem;text-align:center;color:var(--text-mute);font-size:0.
 </div></div></section>
 <section class='section bg-alt' id='agent'><div class='section-inner'>
 <h2>智能体架构</h2>
-<p class='intro'>本地意图路由 + 有界工具编排 + 确定性安全守门员。LLM 负责理解与表达，通行授权由安全层拒绝。</p>
+<p class='intro'>本地意图路由 + LLM 角色规划 + 有界工具编排 + 确定性安全守门员。规则没认出的请求由模型做任务分解（只决定角色、不决定工具），LLM 负责理解与表达，通行授权由安全层拒绝。</p>
 <div class='row'>
 <div class='col'><h3>10 个专业角色</h3>
 <ul><li><strong>安全守门员</strong> — 覆盖 LLM 输出，不授权通行</li>
@@ -152,7 +153,7 @@ footer{padding:2rem 1.5rem;text-align:center;color:var(--text-mute);font-size:0.
 <div class='metric'><div class='num'>22.5ms</div><div class='label'>管线中位延迟</div></div>
 <div class='metric'><div class='num'>55.7</div><div class='label'>mAP50 (BDD@960)</div></div>
 <div class='metric'><div class='num'>78.2%</div><div class='label'>真实红绿灯准确率</div></div>
-<div class='metric'><div class='num'>66</div><div class='label'>单元测试通过</div></div>
+<div class='metric'><div class='num'>104</div><div class='label'>单元测试通过</div></div>
 <div class='metric'><div class='num'>100%</div><div class='label'>合成灯色自检</div></div>
 </div>
 <div class='table-wrap'><table>

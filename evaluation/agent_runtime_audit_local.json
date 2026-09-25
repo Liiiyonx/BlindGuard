@@ -18,7 +18,7 @@
       "name": "chat_completion",
       "passed": true,
       "detail": {
-        "latency_ms": 1584,
+        "latency_ms": 297,
         "content": "RUNTIME_OK",
         "error": "",
         "tools_supported": true
@@ -43,7 +43,7 @@
       "name": "agent_chat_loop",
       "passed": true,
       "detail": {
-        "reply": "当前有高风险目标正在接近，请您停步并用盲杖确认周围环境。",
+        "reply": "当前有高风险目标汽车正在接近正前方，建议停步并用盲杖确认周围环境。",
         "llm_active": true,
         "chat_turns": 1,
         "role_names": [
@@ -120,7 +120,8 @@
             "stage": "routing",
             "status": "completed",
             "intent": "environment",
-            "lead_role": "perception"
+            "lead_role": "perception",
+            "plan_source": "rules"
           },
           {
             "stage": "prefetch",
@@ -244,6 +245,8 @@
           "passage_intent": true,
           "raw_reply_dangerous": true,
           "guard_triggered": true,
+          "action": "replaced",
+          "appended": "",
           "safety_rewritten": true,
           "final_reply_dangerous": false,
           "idempotent": true,
@@ -395,6 +398,8 @@
     ],
     "tool_prefetch_enabled": true,
     "specialist_execution_enabled": true,
+    "llm_planner_enabled": true,
+    "llm_planner_version": "1.0",
     "max_specialist_roles": 3,
     "max_model_tool_calls": 6,
     "vision_active": false,
@@ -422,12 +427,17 @@
         "get_risk_assessment",
         "get_current_detections"
       ],
-      "reason": "检测到环境描述意图，建议先做风险和检测快照"
+      "reason": "检测到环境描述意图，建议先做风险和检测快照",
+      "plan_source": "rules"
     },
     "last_run": {
-      "time": 1790032304.631,
+      "time": 1790307751.949,
       "path": "llm_context",
+      "path_reason": "本地预取与角色执行完成后，交给模型组织回答",
+      "used_local_fallback": false,
       "intent": "environment",
+      "intent_confidence": 0.9,
+      "intent_reason": "检测到环境描述意图，建议先做风险和检测快照",
       "lead_role": "perception",
       "supporting_roles": [
         "risk_analyst",
@@ -435,7 +445,18 @@
         "communicator",
         "safety_guard"
       ],
-      "duration_ms": 3388,
+      "suggested_tools": [
+        "get_risk_assessment",
+        "get_current_detections"
+      ],
+      "plan_source": "rules",
+      "planning": {
+        "source": "rules",
+        "rationale": "",
+        "roles": [],
+        "dropped": []
+      },
+      "duration_ms": 564,
       "prefetch_tools": [
         "get_risk_assessment",
         "get_current_detections"
@@ -447,7 +468,7 @@
           "name": "get_risk_assessment",
           "arguments": "{}",
           "success": true,
-          "duration_ms": 2,
+          "duration_ms": 1,
           "error": "",
           "cache_hit": false,
           "policy_denied": false,
@@ -471,7 +492,7 @@
           "name": "get_navigation_guidance",
           "arguments": "{}",
           "success": true,
-          "duration_ms": 1,
+          "duration_ms": 0,
           "error": "",
           "cache_hit": false,
           "policy_denied": false,
@@ -530,12 +551,14 @@
           "authority": "最高优先级；可覆盖 LLM 输出，但不得授权通行"
         }
       ],
-      "raw_reply": "当前有高风险目标正在接近，请您停步并用盲杖确认周围环境。",
-      "sanitized_reply": "当前有高风险目标正在接近，请您停步并用盲杖确认周围环境。",
+      "raw_reply": "当前有高风险目标汽车正在接近正前方，建议停步并用盲杖确认周围环境。",
+      "sanitized_reply": "当前有高风险目标汽车正在接近正前方，建议停步并用盲杖确认周围环境。",
       "safety_review": {
         "passage_intent": false,
         "raw_reply_dangerous": false,
         "guard_triggered": false,
+        "action": "unchanged",
+        "appended": "",
         "safety_rewritten": false,
         "final_reply_dangerous": false,
         "idempotent": true,
@@ -547,7 +570,8 @@
           "stage": "routing",
           "status": "completed",
           "intent": "environment",
-          "lead_role": "perception"
+          "lead_role": "perception",
+          "plan_source": "rules"
         },
         {
           "stage": "prefetch",
@@ -581,20 +605,20 @@
     },
     "recent_tool_calls": [
       {
-        "time": 1790032301.245,
+        "time": 1790307751.385,
         "round": 0,
         "phase": "prefetch",
         "name": "get_risk_assessment",
         "arguments": "{}",
         "success": true,
-        "duration_ms": 2,
+        "duration_ms": 1,
         "timed_out": false,
         "error": "",
         "cache_hit": false,
         "policy_denied": false
       },
       {
-        "time": 1790032301.245,
+        "time": 1790307751.386,
         "round": 0,
         "phase": "prefetch",
         "name": "get_current_detections",
@@ -607,13 +631,13 @@
         "policy_denied": false
       },
       {
-        "time": 1790032301.246,
+        "time": 1790307751.386,
         "round": 0,
         "phase": "specialist",
         "name": "get_navigation_guidance",
         "arguments": "{}",
         "success": true,
-        "duration_ms": 1,
+        "duration_ms": 0,
         "timed_out": false,
         "error": "",
         "cache_hit": false,

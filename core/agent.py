@@ -6,7 +6,8 @@
 1. 安全守门员：红灯/黄灯/高风险/未知灯色确定性拦截，任何输出都不得授权通行
 2. 工具注册表：统一 schema 校验、读写权限、安全级别、超时、异常和调用审计
 3. 专业能力：实时感知、风险分析、时序事件、视觉观察、偏好管家、运行监控
-4. 编排循环：本地意图路由 → LLM/工具计划 → 行动 → 安全复核 → 有界运行轨迹
+4. 编排循环：本地意图路由 → 行动 → 安全复核 → 有界运行轨迹；
+   规则未命中时由 LLM 角色规划器做任务分解（只决定参与角色，工具由角色表推导）
 5. 主动播报：紧急度评分、原因排序、LLM/模板生成、安全复核和历史上限
 6. 离线兜底：未配置密钥或调用失败时回退模板播报与本地确定性对话
 
@@ -209,6 +210,13 @@ class BlindGuardAgent:
         self.specialist_execution_enabled = bool(
             architecture.get('enable_specialist_team', True)
         )
+        # 规则路由未命中时是否让 LLM 参与任务分解（只决定角色，不决定工具）
+        self.llm_planner_enabled = bool(
+            architecture.get('enable_llm_planner', True)
+        )
+        self.llm_planner_timeout = float(
+            architecture.get('llm_planner_timeout', 8.0)
+        )
 
         # 端点是否支持 tools（首次报错自动降级为纯上下文模式）
         self.tools_supported = True
@@ -262,6 +270,7 @@ class BlindGuardAgent:
             trace_size=self.tool_trace_size,
             max_model_tool_calls=self.max_model_tool_calls,
             max_specialist_roles=self.max_specialist_roles,
+            llm_planner_timeout=self.llm_planner_timeout,
         )
         self.orchestrator.intent_planner_enabled = (
             self.intent_planner_enabled
@@ -270,6 +279,7 @@ class BlindGuardAgent:
         self.orchestrator.specialist_execution_enabled = (
             self.specialist_execution_enabled
         )
+        self.orchestrator.llm_planner_enabled = self.llm_planner_enabled
 
         # LLM 是否真正可用（需同时有 base_url 和 api_key）
         self.llm_ok = bool(self.enabled and self.base_url and self.api_key)
@@ -1119,9 +1129,19 @@ class BlindGuardAgent:
     # ==================== LLM 调用（OpenAI 兼容） ====================
 
     def _call_llm(self, messages: List[Dict], max_tokens: int = 120,
-                  tools: Optional[List[Dict]] = None) -> Dict:
+                  tools: Optional[List[Dict]] = None, *,
+                  temperature: Optional[float] = None,
+                  timeout: Optional[float] = None,
+                  record_failure: bool = True) -> Dict:
         """
         调用 OpenAI 兼容 /chat/completions。
+
+        Args:
+            temperature: 覆盖配置里的采样温度（规划器等要严格 JSON 时传 0）。
+            timeout: 覆盖配置里的超时秒数（规划器用独立短超时，避免拖慢链路）。
+            record_failure: 失败是否计入熔断。规划器传 False——
+                它是可选的增强步骤，失败应当静默降级，不能把
+                "在线" 徽标抖成 "本地回退"，也不该加速 30 秒熔断。
 
         Returns:
             assistant message 字典（含 content 与可选 tool_calls）；
@@ -1133,12 +1153,16 @@ class BlindGuardAgent:
         if time.time() < self._fail_skip_until:
             return {'content': ''}
 
+        request_timeout = self.timeout if timeout is None else float(timeout)
+        request_temperature = (
+            self.temperature if temperature is None else float(temperature)
+        )
         use_tools = bool(tools) and self.tools_supported
         for _ in range(2):
             payload = {
                 'model': self.model,
                 'messages': messages,
-                'temperature': self.temperature,
+                'temperature': request_temperature,
                 'max_tokens': max_tokens,
                 'stream': False,
             }
@@ -1154,13 +1178,14 @@ class BlindGuardAgent:
                 },
             )
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                with urllib.request.urlopen(req, timeout=request_timeout) as r:
                     body = json.loads(r.read().decode('utf-8'))
                 msg = body['choices'][0]['message'] or {}
                 self._fail_count = 0  # 调用成功，重置熔断计数
                 self._llm_degraded = False
                 self._last_error = ''
-                return msg if isinstance(msg, dict) else {'content': str(msg)}
+                return_msg = msg if isinstance(msg, dict) else {'content': str(msg)}
+                return return_msg
             except urllib.error.HTTPError as e:
                 detail = ''
                 try:
@@ -1180,6 +1205,9 @@ class BlindGuardAgent:
                 logger.error(f"LLM 调用失败: {e}")
                 error = f"{type(e).__name__}: {e}"
                 break
+        if not record_failure:
+            logger.info(f"LLM 可选调用失败（不计入熔断）: {error}")
+            return {'content': ''}
         self._register_failure(error)
         return {'content': ''}
 
@@ -1318,6 +1346,8 @@ class BlindGuardAgent:
             'path': str(run.get('path') or ''),
             'path_reason': str(run.get('path_reason') or ''),
             'used_local_fallback': bool(run.get('used_local_fallback')),
+            'plan_source': str(run.get('plan_source') or 'rules'),
+            'planning': dict(run.get('planning') or {'source': 'rules'}),
             'duration_ms': int(run.get('duration_ms') or 0),
             'prefetch_tools': [
                 str(name) for name in (run.get('prefetch_tools') or [])
@@ -1397,6 +1427,11 @@ class BlindGuardAgent:
             'specialist_execution_enabled': (
                 self.specialist_execution_enabled
             ),
+            'llm_planner_enabled': (
+                self.llm_planner_enabled
+                and self.orchestrator.llm_planner_enabled
+            ),
+            'llm_planner_version': self.orchestrator.planner.VERSION,
             'max_specialist_roles': self.max_specialist_roles,
             'max_model_tool_calls': self.max_model_tool_calls,
             'vision_active': self.vlm_ok,
