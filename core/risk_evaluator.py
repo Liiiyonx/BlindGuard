@@ -236,7 +236,7 @@ class RiskEvaluator:
         }
         # 透传跟踪器/红绿灯的附加信息
         for key in ('light_state', 'track_id', 'track_age', 'trend',
-                    'conf_stable', 'conf_smooth'):
+                    'conf_stable'):
             if key in detection:
                 result[key] = detection[key]
         return result

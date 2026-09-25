@@ -94,17 +94,21 @@ class SimpleTracker:
             det['track_id'] = best['id']
             det['track_age'] = round(now - best['first_seen'], 1)
 
-            # 轨迹稳定置信度：该目标历史最高确认度。旧字段名义上叫
-            # conf_smooth，实际不是平滑值；保留别名仅为兼容旧前端数据。
+            # 轨迹稳定置信度：该目标历史最高确认度（字段名如实反映语义）。
             # 风险播报仍使用单帧 confidence，避免历史高分掩盖当前帧证据。
             conf = float(det.get('confidence', 0))
             best['best_conf'] = max(best.get('best_conf', 0.0), conf)
             det['conf_stable'] = round(best['best_conf'], 3)
-            det['conf_smooth'] = det['conf_stable']
 
-            # 趋势：与 trend_window 秒前最早的样本比较面积
+            # 趋势：与最接近 trend_window 秒前的样本比较面积。
+            # 从最新往回找第一个「已满窗口」的样本——帧率稀疏时若取最早的
+            # 满足者，会与远早于窗口的样本比较，面积比被放大而误判为接近。
+            # 第一个元素是刚写入的当前帧样本，必须跳过：当 trend_window 为 0
+            # 时它会满足条件并与自己比较，得出恒定的 stable。
             ref_area = None
-            for t, a in best['history']:
+            history_iter = reversed(best['history'])
+            next(history_iter, None)
+            for t, a in history_iter:
                 if now - t >= self.trend_window:
                     ref_area = a
                     break

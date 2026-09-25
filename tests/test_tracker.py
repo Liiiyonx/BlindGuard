@@ -72,7 +72,6 @@ class AnnotationTests(TrackerTestCase):
         self.assertEqual(det['track_age'], 0.0)
         self.assertEqual(det['trend'], 'stable')
         self.assertEqual(det['conf_stable'], 0.5)
-        self.assertEqual(det['conf_smooth'], 0.5)
         self.assertEqual(self.tracker.active_count, 1)
 
     def test_same_object_across_frames_keeps_id(self):
@@ -130,7 +129,7 @@ class AnnotationTests(TrackerTestCase):
 
         self.assertEqual({d1['track_id'], d2['track_id']}, {1, 2})
 
-    def test_conf_smooth_is_historical_max_not_a_smoothed_value(self):
+    def test_conf_stable_is_historical_max_not_a_smoothed_value(self):
         self.tracker.update([_det(confidence=0.4)])
         self.clock.advance(0.05)
         self.tracker.update([_det(confidence=0.9)])
@@ -139,9 +138,8 @@ class AnnotationTests(TrackerTestCase):
         det = _det(confidence=0.2)
         self.tracker.update([det])
 
-        # 历史最高分被保留，当前帧的低分不会拉低 conf_stable / conf_smooth
+        # 历史最高分被保留，当前帧的低分不会拉低 conf_stable
         self.assertEqual(det['conf_stable'], 0.9)
-        self.assertEqual(det['conf_smooth'], det['conf_stable'])
 
     def test_area_falls_back_to_bbox_when_missing_or_zero(self):
         det = _det(bbox=(0, 0, 10, 20))  # 无 area 字段
@@ -243,6 +241,32 @@ class TrendTests(TrackerTestCase):
         # 第二帧距首帧仅 0.5s (< trend_window)，没有可用的历史参照
         self.assertEqual(
             self._two_frame_trend(100.0, 200.0, advance=0.5), 'stable')
+
+    def test_trend_prefers_sample_closest_to_window_over_oldest(self):
+        # 帧率稀疏时历史里会同时存在多个「已满窗口」的样本：
+        # 5s 前面积 400、3s 前面积 100，当前 200。
+        # 参照应取最接近窗口的 3s 前样本（100 → 200 为接近），
+        # 而不是最早的 5s 前样本（400 → 200 会被误判为远离）。
+        self.tracker.update([_det(area=400.0)])
+        self.clock.advance(2.0)
+        self.tracker.update([_det(area=100.0)])
+        self.clock.advance(3.0)
+
+        det = _det(area=200.0)
+        self.tracker.update([det])
+
+        self.assertEqual(det['trend'], 'approaching')
+
+    def test_zero_window_compares_against_previous_frame_not_itself(self):
+        # trend_window=0 表示「与上一帧比较」：参照不能取刚写入的当前帧，
+        # 否则面积比恒为 1.0，永远得到 stable
+        tracker = SimpleTracker(trend_window=0.0, trend_ratio=1.25)
+        tracker.update([_det(area=100.0)])
+
+        det = _det(area=225.0)
+        tracker.update([det])
+
+        self.assertEqual(det['trend'], 'approaching')
 
 
 if __name__ == '__main__':

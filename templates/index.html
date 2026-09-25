@@ -2362,8 +2362,7 @@
                 }
                 data.detections.forEach(det => {
                     // 轨迹置信度优先（目标历史最高确认度，稳定），单帧置信度兜底
-                    const confV = det.conf_stable != null ? det.conf_stable
-                        : (det.conf_smooth != null ? det.conf_smooth : det.confidence);
+                    const confV = det.conf_stable != null ? det.conf_stable : det.confidence;
                     const conf = Math.max(0, Math.min(100, Number(confV || 0) * 100)).toFixed(1);
                     const risk = ['critical', 'high', 'medium', 'low', 'safe'].includes(det.risk_level)
                         ? det.risk_level : 'safe';

@@ -16,7 +16,6 @@ class TemplateTests(unittest.TestCase):
         self.assertIn('X-BlindGuard-Token', html)
         self.assertIn('AUTH_TOKEN', html)
         self.assertIn('conf_stable', html)
-        self.assertIn('conf_smooth', html)
 
     def test_frontend_does_not_inject_dynamic_html(self):
         html = (ROOT / 'templates' / 'index.html').read_text(encoding='utf-8')
